@@ -352,6 +352,8 @@ class RainEngine:
 
         now = time.time()
 
+        p = self.p
+
         self._push(self._inter_share, now, getattr(state, "inter_share", None))
         self._push(self._delta_is, now, getattr(state, "pace_delta_inter_vs_slick_s", None))
 
