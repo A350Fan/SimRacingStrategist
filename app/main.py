@@ -90,6 +90,32 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return ""
 
+    def _session_label_from_udp(self, st: object) -> str:
+        """
+        Map UDP sessionType IDs (F1 20xx/25) to our coarse categories: P/Q/R/TT.
+        We only need the category, not the exact session number.
+        """
+        try:
+            v = int(st)
+        except Exception:
+            return ""
+
+        # Common Codemasters sessionType mapping (coarse):
+        # Practice: 1..4   (P1/P2/P3 + short/one-shot practice depending on year)
+        # Quali:    5..9   (Q1/Q2/Q3 + short + one-shot)
+        # Race:    10..11  (Race + Race2)
+        # TT:      12      (Time Trial)
+        if 1 <= v <= 4:
+            return "P"
+        if 5 <= v <= 9:
+            return "Q"
+        if 10 <= v <= 11:
+            return "R"
+        if v == 12:
+            return "TT"
+
+        return ""
+
     def _on_estimate_deg(self):
         track = self.cmbTrack.currentText().strip()
         tyre = self.cmbTyre.currentText().strip()
@@ -757,16 +783,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if tyre_cat not in ("SLICK", "INTER", "WET"):
             tyre_cat = ""
 
-        # Session type from UDP (fallback "R" to preserve old behavior)
-        st = getattr(state, "session_type_id", None)
-        if st == 1:
-            session_label = "P"
-        elif st == 2:
-            session_label = "Q"
-        elif st == 3:
-            session_label = "R"
-        else:
-            session_label = "R"
+        # Session type from UDP (coarse P/Q/R/TT). Keep old fallback to "R".
+        session_label = self._session_label_from_udp(getattr(state, "session_type_id", None)) or "R"
 
         lap_time_s = float(last_ms) / 1000.0
 
@@ -879,16 +897,8 @@ class MainWindow(QtWidgets.QMainWindow):
             track_dir = base / self._safe_token(track_label, fallback="UnknownTrack")
             track_dir.mkdir(parents=True, exist_ok=True)
 
-            # ---- session label (P/Q/R) from UDP session_type_id ----
-            st = getattr(state, "session_type_id", None)
-            if st == 1:
-                session_label = "P"
-            elif st == 2:
-                session_label = "Q"
-            elif st == 3:
-                session_label = "R"
-            else:
-                session_label = ""  # unknown
+            # ---- session label (P/Q/R/TT) from UDP session_type_id ----
+            session_label = self._session_label_from_udp(getattr(state, "session_type_id", None))
 
             # ---- team ----
             team = getattr(state, "player_team_name", None)
