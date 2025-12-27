@@ -73,6 +73,7 @@ Legend:
 
 ### Multi-Game Support
 - ⏳ Add F1 24 profile (then step-by-step down to F1 2017)
+  - 🚧 add F1 2020 profile
 - ⏳ Compatibility layer for missing UDP features in older games
 - ⏳ Optional manual track profiles:
   - track length overrides
@@ -82,10 +83,14 @@ Legend:
 - ⏳ Extend track ID mapping
 - ⏳ Track-specific preset baselines (optional)
 
+### Linux Support
+- ⏳ adding support for linux distros
+
 ### Quality of Life
 - ⏳ Installer / portable build
 - ⏳ Auto-update check (optional)
 - ⏳ Better logging controls (verbosity levels)
+- ⏳ Showing explicit words for weather etc. instead of numbers
 
 ---
 
