@@ -1,157 +1,184 @@
 # Known Issues
 
-Diese Datei listet bekannte Probleme, Einschränkungen und Workarounds des Projekts auf.
+This document lists known problems, limitations, and workarounds of the project.
 
 ---
 
-## 🟥 Kritische Issues
+## 🟥 Critical Issues
 
-### KI-001 – Minisektor-Erkennung am Rundenstart möglicherweise unzuverlässig
-**Betroffene Version(en):** v0.1.0  
-**Betroffene Module:** MiniSectorTracker, f1_udp  
-**Beschreibung:**  
-Der erste Minisektor (MS01) kann beim Rundenstart übersprungen werden, wenn der erste UDP-Tick verspätet eintrifft oder die LapDist bereits deutlich > 0 ist.
+### KI-001 – Minisector detection at lap start may be unreliable
+**Affected version(s):** v0.1.0  
+**Affected modules:** MiniSectorTracker, f1_udp  
 
-**Auswirkung:**  
-- Unvollständige Minisektor-Daten für die Runde  
-- Delta-/PB-Berechnungen nicht möglich
+**Description:**  
+The first minisector (MS01) may be skipped at the start of a lap if the first UDP tick arrives late or if the lap distance (`LapDist`) is already significantly greater than zero.
+
+**Impact:**  
+- Incomplete minisector data for the lap  
+- Delta / PB calculations not possible  
 
 **Workaround:**  
-- Robustheits-Logik aktiv (`treat_as_lap_start`)
-- Backfilling über Distanzproportion
+- Enable robustness logic (`treat_as_lap_start`)  
+- Backfilling using distance proportion  
 
-**Geplanter Fix:**  
-Weitere Validierung mit unterschiedlichen FPS-/Tick-Raten, evtl. Zeit-basierter Startanker.
+**Planned fix:**  
+Further validation with different FPS / UDP tick rates, possibly introducing a time-based lap start anchor.
 
 ---
 
-### KI-002 – Minisektor-Tracking instabil bei Flashbacks
-**Betroffene Version(en):** v0.1.0  
-**Betroffene Module:** MiniSectorTracker  
-**Beschreibung:**  
-Bei Flashbacks können Minisektoren überschrieben oder doppelt gezählt werden, wenn Lap-Zeit und Distanz nicht konsistent zurückspringen.
+### KI-002 – Minisector tracking unstable during flashbacks
+**Affected version(s):** v0.1.0  
+**Affected modules:** MiniSectorTracker  
 
-**Auswirkung:**  
-- Inkonsistente Minisektor-Zeiten  
-- PB/Best-Werte potenziell verfälscht
+**Description:**  
+When using flashbacks, minisectors may be overwritten or counted twice if lap time and lap distance do not rewind consistently.
+
+**Impact:**  
+- Inconsistent minisector times  
+- PB / best values may be corrupted  
 
 **Workaround:**  
-Rollback-Logik entfernt nur Minisektoren, deren `end_ms` > aktuelle Zeit ist.
+Rollback logic only removes minisectors whose `end_ms` is greater than the current lap time.
 
-**Geplanter Fix:**  
-Zusätzliche Absicherung über Lap-UID oder Distanz-Zeit-Konsistenzprüfung.
+**Planned fix:**  
+Additional safeguards using a lap UID or distance–time consistency checks.
 
 ---
 
-## 🟧 Mittlere Issues
+## 🟧 Medium Issues
 
-### KI-003 – Minisektor-Fallback in F1 2020 nur näherungsweise korrekt
-**Betroffene Version(en):** v0.1.0  
-**Betroffene Module:** MiniSectorTracker  
-**Beschreibung:**  
-Da F1 2020 keine echten Sektor-Start-Distanzen liefert, werden Sektoren als Drittel der Streckenlänge approximiert.
+### KI-003 – Minisector timing may deviate by up to ±16.67 ms
+**Affected version(s):** v0.1.0  
+**Affected modules:** MiniSectorTracker  
 
-**Auswirkung:**  
-- Minisektoren sind nicht real streckentreu  
-- Vergleichbarkeit eingeschränkt
+**Description:**  
+Due to the maximum 60 Hz UDP tick rate of the F1 games, minisector times cannot be measured with true millisecond precision.  
+As a result, minisector times and theoretical lap times may partially deviate from in-game timings.
+
+**Impact:**  
+- Inaccurate minisector times  
+- PB / best values may be affected  
+
+**Planned fix:**  
+A solution for more accurate minisector timing is still under investigation.
+
+### KI-004 – Minisector fallback in F1 2020 is only approximate
+**Affected version(s):** v0.1.0  
+**Affected modules:** MiniSectorTracker  
+
+**Description:**  
+Since F1 2020 does not provide real sector start distances, sectors are approximated as thirds of the total track length.
+
+**Impact:**  
+- Minisectors are not track-accurate  
+- Comparability is limited  
 
 **Workaround:**  
-Fallback explizit nur für ältere Games aktivieren (`allow_sector_fallback=True`).
+Explicitly enable the fallback only for older games (`allow_sector_fallback=True`).
 
-**Geplanter Fix:**  
-Optionale manuelle Track-Profile mit echten Sektor-Distanzen.
+**Planned fix:**  
+Optional manual track profiles with real sector distances.
 
-> Hinweis: Minisektoren in F1 2020 gelten aktuell als **experimentelles Feature**  
-> und sind nicht mit der Genauigkeit von F1 25 vergleichbar.
-
----
-
-### KI-004 – F1 2020: Minisektor-Zeiten werden bei jeder neuen Runde geleert
-**Betroffene Version(en):** v0.1.0  
-**Betroffene Module:** MiniSectorTracker, F1 2020 Fallback-Logik  
-**Beschreibung:**  
-In F1 2020 werden die `last_ms`-Werte aller Minisektoren beim Start jeder neuen Runde zurückgesetzt.  
-Statt vorhandene Minisektor-Zeiten beim erneuten Überfahren zu überschreiben, wird der gesamte Satz geleert.
-
-**Auswirkung:**  
-- Keine kontinuierliche Minisektor-Historie über mehrere Runden  
-- Keine PB-/Delta-Vergleiche zwischen Runden möglich  
-- Minisektor-basierte Strategieauswertung stark eingeschränkt
-
-**Ursache:**  
-Design-bedingt durch fehlende native Minisektor- und Sektor-Distanzdaten in F1 2020.  
-Die aktuelle Logik behandelt jede Runde als isolierte Einheit.
-
-**Geplanter Fix:**  
-- Trennung von `last_ms` (aktuelle Runde) und `pb_ms` (persistente Bestzeit) erzwingen  
-- Optionales Beibehalten der letzten gültigen Minisektor-Zeiten über Runden hinweg  
-- Klarer Feature-Flag: `persistent_minisectors=False` für ältere Games
-
+> **Note:** Minisectors in F1 2020 are currently considered an **experimental feature**  
+> and are not comparable in accuracy to F1 25.
 
 ---
 
-### KI-005 – Regen-Forecast zeitweise `n/a`
-**Betroffene Version(en):** v0.1.0  
-**Betroffene Module:** RainEngine, f1_udp  
-**Beschreibung:**  
-Forecast-Werte (z. B. Minute 3 / 20) können `None` sein, wenn noch keine vollständige UDP-Serie empfangen wurde.
+### KI-005 – F1 2020: Minisector times are cleared on every new lap
+**Affected version(s):** v0.1.0  
+**Affected modules:** MiniSectorTracker, F1 2020 fallback logic  
 
-**Auswirkung:**  
-- Geringere Confidence der Strategieentscheidung  
-- Frühphase einer Session weniger zuverlässig
+**Description:**  
+In F1 2020, all minisector `last_ms` values are reset at the start of each new lap.  
+Instead of overwriting minisector times when crossing them again, the entire minisector set is cleared.
+
+**Impact:**  
+- No continuous minisector history across laps  
+- No PB / delta comparisons between laps  
+- Minisector-based strategy evaluation is severely limited  
+
+**Root cause:**  
+Design limitation caused by missing native minisector and sector distance data in F1 2020.  
+The current logic treats each lap as an isolated unit.
+
+**Planned fix:**  
+- Enforce separation between `last_ms` (current lap) and `pb_ms` (persistent best)  
+- Optional persistence of last valid minisector times across laps  
+- Clear feature flag: `persistent_minisectors=False` for older games  
+
+
+---
+
+### KI-006 – Rain forecast occasionally reported as `n/a`
+**Affected version(s):** v0.1.0  
+**Affected modules:** RainEngine, f1_udp  
+
+**Description:**  
+Forecast values (e.g. minute 3 / 20) may be `None` if a complete UDP forecast series has not yet been received.
+
+**Impact:**  
+- Reduced confidence in strategy decisions  
+- Early session phases are less reliable  
+
+    > This typically affects the first ~5–15 seconds after session start.
 
 **Workaround:**  
-Median-basierte Fusion ignoriert fehlende Werte automatisch.
+Median-based data fusion automatically ignores missing values.
 
-**Geplanter Fix:**  
-Forecast-Prebuffering über Mindestanzahl an Samples.
+**Planned fix:**  
+Forecast pre-buffering using a minimum number of samples.
 
 ---
 
-## 🟨 Niedrige Issues
+## 🟨 Low Issues
 
-### KI-006 – Strategy Cards im Moment nur Platzhalter
-**Betroffene Version(en):** v0.1.0  
-**Betroffene Module:** UI  
-**Beschreibung:**  
-Strategy Cards nutzen aktuell nur Platzhalter-Daten.
+### KI-007 – Strategy Cards are currently placeholders
+**Affected version(s):** v0.1.0  
+**Affected modules:** UI  
 
-**Auswirkung:**  
-- UI zeigt noch keine echten Live-Empfehlungen
+**Description:**  
+Strategy Cards currently use placeholder data only.
+
+**Impact:**  
+- UI does not yet display real live recommendations  
 
 **Workaround:**  
-Nur zur Visualisierung nutzen.
+Use for visual layout and UI validation only.
 
-**Geplanter Fix:**  
-Anbindung an echte Strategy-Outputs.
-
----
-
-## 🧪 Experimentelle / Design-bedingte Einschränkungen
-
-### KI-006 – Feld-Deltas nicht immer verfügbar
-**Betroffene Version(en):** v0.1.0  
-**Betroffene Module:** RainEngine  
-**Beschreibung:**  
-Pace-Deltas aus dem Feld sind in kurzen Sessions oder Trainings teils leer.
-
-**Hinweis:**  
-Designbedingt – ausreichend Samples nötig.
-
-**Geplante Verbesserung:**  
-- Fallback auf eigene Referenz-Laps
-- Nutzung von Rundendatenbank
+**Planned fix:**  
+Connect to real strategy outputs.
 
 ---
 
-### KI-008 – Reifenverschleiß-Lernen benötigt Datenmenge
-**Betroffene Version(en):** v0.1.0  
-**Betroffene Module:** Degradation Model  
-**Beschreibung:**  
-Verschleiß- & Degradationsmodelle liefern erst nach mehreren sauberen Stints belastbare Ergebnisse.
+## 🧪 Experimental / Design-related Limitations
 
-**Hinweis:**  
-Erwartetes Verhalten, kein Bug.
+### KI-008 – Field deltas not always available
+**Affected version(s):** v0.1.0  
+**Affected modules:** RainEngine  
 
-**Geplante Verbesserung:**  
-Konfidenz-Anzeige & Mindestdaten-Hinweise im UI.
+**Description:**  
+Field-based pace deltas may be empty in short sessions or practice runs.
+
+**Note:**  
+By design – sufficient sample size is required.
+
+**Planned improvement:**  
+- Fallback to own reference laps  
+- Integration with lap database  
+
+---
+
+### KI-009 – Tyre wear learning requires sufficient data
+**Affected version(s):** v0.1.0  
+**Affected modules:** Degradation Model  
+
+**Description:**  
+Wear and degradation models only produce reliable results after several clean stints.
+
+**Note:**  
+Expected behavior, not a bug.
+
+**Planned improvement:**  
+Confidence indicators and minimum data hints in the UI.
+
+---
