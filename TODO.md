@@ -34,7 +34,11 @@ Legend:
   - unusual splits (too small/too large)
 
 ### Rain / Strategy Core
-- ⏳ Expose RainEngine decision details in UI/log:
+- 🚧 Live race strategy reacting to:
+  - weather changes
+  - Safety Car / VSC phases
+  - pit loss vs. pace delta evaluation
+- 🚧 Expose RainEngine decision details in UI/log:
   - wetness score
   - confidence
   - reasons (signals used)
@@ -45,7 +49,16 @@ Legend:
 
 ## NEXT (User-facing strategy output)
 
+### Linux Support
+- ⏳ adding support for linux distros
+
 ### Strategy UI
+- ⏳ Calculate strategy based on selected team context
+  - pit loss model
+  - tyre behavior differences
+- ⏳ Consider opponent strategies and gaps
+  - defensive pit stops (e.g. Inter → Wet if gap allows)
+  - undercut / overcut awareness
 - ⏳ Replace placeholder Strategy Cards with real outputs
   - Plan A/B/C from strategy core + DB stats
   - show confidence + short reasoning
@@ -53,6 +66,10 @@ Legend:
   - BOX / STAY OUT
   - target tyre
   - box-in lap estimate
+- ⏳ Integrate SC/VSC effect into pit window calculation
+  - reduced pit loss
+  - rejoin position estimation
+  - live evaluation using UDP + DB pace
 
 ### Degradation / Pit Windows
 - ⏳ Integrate degradation estimates into strategy cards:
@@ -60,6 +77,10 @@ Legend:
   - 1-stop / 2-stop feasible windows
 - ⏳ Mark and exclude inlaps/outlaps/outliers in UI
   (already supported by analysis logic; needs presentation)
+- 🚧 Use condition SHIFT detection in degradation model
+  - exclude laps after strong condition changes from dry-fit
+- 🚧 Prefer minisector (or at least sector) data over full lap times
+  - allow partial laps (e.g. outlaps without pit minisectors)
 
 ### Safety Car Decisions
 - ⏳ Add SC panel:
@@ -67,6 +88,19 @@ Legend:
   - estimated delta / pit-loss model
   - basic risk tags (traffic, track position)
 
+### UI & Output quality
+- ⏳ Convert lap times from ss.ms to m:ss.ms consistently in UI
+- ⏳ Display Stint ID in UI
+  - e.g. "Stint 2 – Lap 5"
+- 🚧 Show minisector times with color coding
+  - green / yellow / purple (🚧 green not there because no opponent times)
+
+### Driver & Data Selection
+- ⏳ Allow selecting individual drivers
+- ⏳ Automatically highlight the most relevant driver times
+  - closest rivals
+  - strategy-relevant cars
+  - cars changing from e.g. Slick to Inter purple times
 ---
 
 ## LATER (Expansion & polish)
@@ -83,20 +117,33 @@ Legend:
 - ⏳ Extend track ID mapping
 - ⏳ Track-specific preset baselines (optional)
 
-### Linux Support
-- ⏳ adding support for linux distros
+### Weather forecast expansion
+- 🧪 Interpret "next lap" from minute-based forecast samples
+  - map minutes → laps using estimated lap time
+
+### Multiple OS Support
+- ⏳ adding support for Android devices
 
 ### Quality of Life
 - ⏳ Installer / portable build
-- ⏳ Auto-update check (optional)
+- ⏳ Auto-update check
 - ⏳ Better logging controls (verbosity levels)
-- ⏳ Showing explicit words for weather etc. instead of numbers
+- ⏳ Showing explicit words for weather etc. instead of number
+- ⏳ Add audio output for key strategy events
+  - open pit window (“Box box box”)
+  - weather / rain threshold reactions
+  - Safety Car / VSC state changes
+
+
+### AI implementation
+- ⏳ AI-assisted strategy logic
+  - higher-level decision-making
+  - scenario evaluation
+  - long-term race outcome estimation
 
 ---
 
 ## Known Limitations (by design / current scope)
-- CSV import relies on user-generated CSV files from third-party telemetry tools.
-  No third-party telemetry software is bundled or redistributed.
 - Minisector accuracy varies by game:
   - F1 25: native minisectors
   - older titles: approximation/fallback where necessary
