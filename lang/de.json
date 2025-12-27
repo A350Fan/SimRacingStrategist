@@ -75,7 +75,14 @@
   "live.flag_none": "Keine",
   "live.flag_green": "Grün",
   "live.flag_blue": "Blau",
-  "live.flag_yellow": "Gelb"
+  "live.flag_yellow": "Gelb",
 
-
+  "live.weather_fmt": "Wetter: {w}",
+  "live.weather_clear": "Klarer Himmel",
+  "live.weather_light_cloud": "Leicht bewölkt",
+  "live.weather_overcast": "Bedeckt",
+  "live.weather_light_rain": "Leichter Regen",
+  "live.weather_heavy_rain": "Starker Regen",
+  "live.weather_storm": "Sturm",
+  "live.weather_unknown": "Unbekannt"
 }

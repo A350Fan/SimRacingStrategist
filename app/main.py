@@ -1037,10 +1037,31 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.lblSC.text() != sc_line:
                 self.lblSC.setText(sc_line)
 
-            # --- Weather enum (debug-style, raw) ---
-            weather_line = self.tr.t("live.weather_enum_fmt", "Weather(enum): {w}").format(
-                w=(weather if weather >= 0 else self.tr.t("common.na", "n/a"))
-            )
+            # --- Weather as human-readable text (0..5 -> label) ---
+            def _weather_text(w: int | None) -> str:
+                if w is None or int(w) < 0:
+                    return self.tr.t("common.na", "n/a")
+                try:
+                    wi = int(w)
+                except Exception:
+                    return self.tr.t("common.na", "n/a")
+
+                return {
+                    0: self.tr.t("live.weather_clear", "Clear Skies"),
+                    1: self.tr.t("live.weather_light_cloud", "Light Cloud"),
+                    2: self.tr.t("live.weather_overcast", "Overcast"),
+                    3: self.tr.t("live.weather_light_rain", "Light Rain"),
+                    4: self.tr.t("live.weather_heavy_rain", "Heavy Rain"),
+                    5: self.tr.t("live.weather_storm", "Storm"),
+                }.get(wi, f"{self.tr.t('live.weather_unknown', 'Unknown')}({wi})")
+
+            weather_txt = _weather_text(weather if isinstance(weather, int) else None)
+
+            # optional: keep enum for debugging (can remove if you want it clean)
+            if isinstance(weather, int) and weather >= 0:
+                weather_txt = f"{weather_txt} (enum:{weather})"
+
+            weather_line = self.tr.t("live.weather_fmt", "Weather: {w}").format(w=weather_txt)
             if self.lblWeather.text() != weather_line:
                 self.lblWeather.setText(weather_line)
 
