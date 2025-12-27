@@ -20,7 +20,7 @@ Semantic Versioning (in an early 0.x stage).
 ## [0.1.2] - 2025-12-27
 
 ### Added
-- debugging via UDP dump & replay (Instructions can be found at `.docs/debugging`)
+- debugging via UDP dump & replay (Instructions can be found at `.docs/how to use/debugging`)
 ---
 ## [0.1.1] - 2025-12-27
 
