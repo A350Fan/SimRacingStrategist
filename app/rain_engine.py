@@ -305,7 +305,7 @@ class RainEngine:
         # cache baseline pace (track, tyre) -> (t, median_pace)
         self._baseline_cache: dict[Tuple[str, str], Tuple[float, float]] = {}
 
-
+        self.p = RainPitTuning()
 
     def _push(self, dq: Deque[Tuple[float, float]], t: float, v: Optional[float]):
         if v is None:
