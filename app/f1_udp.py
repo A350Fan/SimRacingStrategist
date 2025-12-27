@@ -1175,37 +1175,48 @@ class F1UDPListener:
                 # order in spec comments often differs; we keep consistent mapping as FL, FR, RL, RR
                 w1, w2, w3, w4 = struct.unpack_from("<ffff", data, off)
 
-                def _to_remaining(x: float) -> Optional[float]:
+                def _to_wear_pct(x: float) -> Optional[float]:
+                    """
+                    Return tyre wear in percent:
+                    0 = new, 100 = fully worn.
+
+                    Some games/packets may deliver 0..1; we normalize to 0..100 in that case.
+                    """
                     try:
                         xv = float(x)
                     except Exception:
                         return None
-                    # x is "wear %" (0=new -> 100=dead) in many specs
+
+                    # normalize 0..1 -> 0..100 (defensive)
+                    if 0.0 <= xv <= 1.0:
+                        xv *= 100.0
+
                     if xv < 0.0 or xv > 100.0:
                         return None
-                    rem = 100.0 - xv
-                    if rem < 0.0:
-                        rem = 0.0
-                    if rem > 100.0:
-                        rem = 100.0
-                    return rem
 
-                r1 = _to_remaining(w1)
-                r2 = _to_remaining(w2)
-                r3 = _to_remaining(w3)
-                r4 = _to_remaining(w4)
+                    # clamp (defensive)
+                    if xv < 0.0:
+                        xv = 0.0
+                    if xv > 100.0:
+                        xv = 100.0
+                    return xv
 
-                if r1 is not None and self.state.player_wear_fl != r1:
-                    self.state.player_wear_fl = r1
+                p1 = _to_wear_pct(w1)
+                p2 = _to_wear_pct(w2)
+                p3 = _to_wear_pct(w3)
+                p4 = _to_wear_pct(w4)
+
+                if p1 is not None and self.state.player_wear_fl != p1:
+                    self.state.player_wear_fl = p1
                     changed = True
-                if r2 is not None and self.state.player_wear_fr != r2:
-                    self.state.player_wear_fr = r2
+                if p2 is not None and self.state.player_wear_fr != p2:
+                    self.state.player_wear_fr = p2
                     changed = True
-                if r3 is not None and self.state.player_wear_rl != r3:
-                    self.state.player_wear_rl = r3
+                if p3 is not None and self.state.player_wear_rl != p3:
+                    self.state.player_wear_rl = p3
                     changed = True
-                if r4 is not None and self.state.player_wear_rr != r4:
-                    self.state.player_wear_rr = r4
+                if p4 is not None and self.state.player_wear_rr != p4:
+                    self.state.player_wear_rr = p4
                     changed = True
 
             except Exception:
