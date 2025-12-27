@@ -41,6 +41,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tr = Translator(self.cfg.language)
 
         self.watcher: Optional[FolderWatcher] = None
+        self.out_watcher: Optional[FolderWatcher] = None  # NEW: watch udp_output_root too
 
         self.udp: Optional[F1UDPListener] = None
         self._dedupe_mtime = {}  # src_path -> last_mtime_ns
@@ -629,15 +630,26 @@ class MainWindow(QtWidgets.QMainWindow):
         self._start_services_if_possible()
 
     def _start_services_if_possible(self):
-        # watcher
+        # watcher 1: telemetry_root (Iko/Overtake CSVs)
         if self.cfg.telemetry_root:
             root = Path(self.cfg.telemetry_root)
             if root.exists():
                 self.watcher = FolderWatcher(root, self._on_new_csv)
                 self.watcher.start()
-                self.status.showMessage("Folder watcher started.", 2500)
+                self.status.showMessage("Telemetry watcher started.", 2500)
             else:
                 self.status.showMessage("Telemetry root folder does not exist.", 4000)
+
+        # watcher 2: udp_output_root (your own UDP lap CSVs)
+        out_root = (getattr(self.cfg, "udp_output_root", "") or "").strip()
+        if out_root:
+            out = Path(out_root)
+            if out.exists():
+                self.out_watcher = FolderWatcher(out, self._on_new_csv)
+                self.out_watcher.start()
+                self.status.showMessage("Output watcher started.", 2500)
+            else:
+                self.status.showMessage("Output folder does not exist.", 4000)
 
         # udp
         if self.cfg.udp_enabled:
@@ -654,9 +666,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _stop_services(self):
         if self.watcher:
-            try: self.watcher.stop()
-            except Exception: pass
+            try:
+                self.watcher.stop()
+            except Exception:
+                pass
             self.watcher = None
+
+        if self.out_watcher:
+            try:
+                self.out_watcher.stop()
+            except Exception:
+                pass
+            self.out_watcher = None
         if self.udp:
             try: self.udp.stop()
             except Exception: pass
