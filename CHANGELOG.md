@@ -9,16 +9,20 @@ Semantic Versioning (in an early 0.x stage).
 ## [Unreleased]
 
 ### Added
-- (add upcoming features here)
+- None
 
 ### Changed
-- (add behavioural changes here)
+- None
 
 ### Fixed
-- (add bug fixes here)
+- None
 
 ---
+## [0.1.1] - 2025-12-27
 
+### Added
+- weather visualization as text
+---
 ## [0.1.0] - 2025-12-27
 
 ### Added
