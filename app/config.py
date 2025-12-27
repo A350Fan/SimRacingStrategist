@@ -63,7 +63,6 @@ def load_config() -> AppConfig:
             game_profile_key=str(data.get("game_profile_key", "AUTO")),
         )
 
-
     except Exception:
         cfg = AppConfig()
         save_config(cfg)
