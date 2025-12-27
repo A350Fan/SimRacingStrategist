@@ -17,6 +17,11 @@ Semantic Versioning (in an early 0.x stage).
 ### Fixed
 - None
 ---
+## [0.1.3] - 2025-12-27
+
+### Added
+- standalone CSV creation and tracking
+---
 ## [0.1.2] - 2025-12-27
 
 ### Added
