@@ -524,7 +524,7 @@ class RainEngine:
 
         # hard floor: rely on actual rain% (not weather enum), because after rain weather may drop to 2 while track stays wet
         if s_now is not None:
-            wetness = max(wetness, float(s_now) * 0.75)
+            wetness = max(wetness, float(s_now) * p.rain_now_floor_factor)
 
         # --- Separate "full wet" score (Inter -> Wet) ---
         fw0 = None
