@@ -506,13 +506,13 @@ class RainEngine:
             parts.append(sig)
             weights.append(w)
 
-        add(s0, 0.15)  # weather enum: weak hint
-        add(s_now, 0.25)  # current rain%: strong hint
-        add(s_temp, 0.22)  # temp trend: strong transition signal
-        add(s2, 0.35)
-        add(s1, 0.25)
-        add(s3, 0.20)
-        add(s4, 0.20)
+        add(s0, p.w_weather_enum)  # weather enum: weak hint
+        add(s_now, p.w_rain_now)  # current rain%: strong hint
+        add(s_temp, p.w_temp_trend)  # temp trend: strong transition signal
+        add(s2, p.w_delta_is)
+        add(s1, p.w_inter_share)
+        add(s3, p.w_forecast)
+        add(s4, p.w_baseline_loss)
 
         if parts and weights:
             wsum = sum(weights)
