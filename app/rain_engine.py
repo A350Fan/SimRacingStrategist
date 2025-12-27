@@ -449,7 +449,7 @@ class RainEngine:
         s_now = None
         if rain_now_med is not None:
             # 0..100 -> map to 0..1 with mild threshold
-            s_now = _clamp01((float(rain_now_med) - 5.0) / 55.0)
+            s_now = _clamp01((float(rain_now_med) - p.rain_now_map_lo) / p.rain_now_map_span)
 
         # s_temp: track/air temperature trend (rain start/end indicator)
         s_temp = None
