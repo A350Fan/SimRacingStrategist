@@ -35,6 +35,207 @@ class RainEngineOutput:
     confidence: float       # 0..1
     debug: str
 
+@dataclass(frozen=True)
+class RainPitTuning:
+    # =========================================================
+    # 1) Wetness fusion / signal weights
+    # =========================================================
+
+    w_weather_enum: float = 0.15
+    # Gewicht des Weather-Enums (0..5 aus dem Game).
+    # Sehr frühes, aber ungenaues Signal (z.B. "Light Rain").
+    # Höher = früher auf Regen reagieren, aber mehr False Positives.
+
+    w_rain_now: float = 0.25
+    # Gewicht von rain_now_pct (aktueller Regen-/Wetterstatus).
+    # Achtung: im F1-Game träge und nicht rein physisch.
+    # Höher = HUD/Weather beeinflusst Entscheidung stärker.
+
+    w_temp_trend: float = 0.22
+    # Gewicht der Temperatur-Trends (Track/Air slope).
+    # Stark für Übergänge (Regen beginnt / endet).
+    # Höher = schneller reagieren bei abtrocknender oder abkühlender Strecke.
+
+    w_delta_is: float = 0.35
+    # Gewicht der Pace-Differenz Inter vs Slick (ΔI-S).
+    # Stärkstes reales Performance-Signal.
+    # Höher = mehr datengetriebene Entscheidungen.
+
+    w_inter_share: float = 0.25
+    # Gewicht des Inter-Anteils im Feld.
+    # Spiegelt kollektive Entscheidung wider, aber oft träge.
+    # Höher = mehr „Feldlogik“, weniger Eigeninitiative.
+
+    w_forecast: float = 0.20
+    # Gewicht des kurzfristigen Forecasts (rain_next).
+    # Wichtig für antizipatives Handeln.
+    # Höher = früher reagieren auf kommenden Regen/Trockenheit.
+
+    w_baseline_loss: float = 0.20
+    # Gewicht deines eigenen Pace-Verlusts ggü. DB-Baseline.
+    # Höher = persönliches Fahrgefühl zählt stärker als Feld.
+
+    # ---------------------------------------------------------
+    # rain_now -> wetness mapping
+    # ---------------------------------------------------------
+
+    rain_now_map_lo: float = 5.0
+    # Unterhalb dieses rain_now-Werts wird es als „praktisch trocken“ gewertet.
+
+    rain_now_map_span: float = 55.0
+    # Spannweite, über die rain_now von trocken → voll nass skaliert wird.
+    # Größer = rain_now wirkt flacher / weniger aggressiv.
+
+    rain_now_floor_factor: float = 0.75
+    # Untergrenze: wetness >= rain_now_signal * Faktor.
+    # Verhindert, dass Wetness zu niedrig wird, wenn es laut HUD regnet.
+
+    # ---------------------------------------------------------
+    # cold-track early switch boost
+    # ---------------------------------------------------------
+
+    cold_track_ref_c: float = 22.0
+    # Referenztemperatur: unterhalb davon gilt die Strecke als „kalt“.
+
+    cold_track_span_c: float = 18.0
+    # Temperaturspanne, über die der Kälte-Bonus wirkt.
+
+    cold_track_boost_max: float = 0.08
+    # Maximaler Zusatz zur Wetness bei kalter Strecke.
+    # Höher = früher Inter bei kaltem Asphalt.
+
+    # =========================================================
+    # 2) Confidence model
+    # =========================================================
+
+    conf_base: float = 0.15
+    # Basis-Confidence ohne Signale.
+
+    conf_per_signal: float = 0.20
+    # Zusatz-Confidence pro vorhandenem, gültigem Signal.
+
+    conf_samples_factor: float = 0.15
+    # Zusatz-Confidence durch genügend Samples im Rolling Window.
+    # Höher = stabilere, aber langsamere Entscheidungen.
+
+    # =========================================================
+    # 3) Condition shift detection (Slick->Inter responsiveness)
+    # =========================================================
+
+    cond_rain_now_on: float = 18.0
+    # Ab rain_now >= diesem Wert gilt: „es könnte kippen“.
+
+    cond_track_drop_cpm: float = -0.45
+    # TrackTemp-Abfall (°C/min), der auf Regenbeginn hindeutet.
+
+    cond_delta_is_on: float = -0.25
+    # Δ(I-S) <= dieser Wert → Inter wird schneller → Conditions kippen.
+
+    cond_fc_ramp_3to5: float = 18.0
+    # Forecast-Anstieg von 3→5 Minuten, der als plötzlicher Regen gilt.
+
+    shift_boost: float = 0.08
+    # Zusatz-Wetness bei erkannter Condition-Shift.
+    # Macht Slick->Inter schneller, aber nicht zwingend.
+
+    # =========================================================
+    # 4) Slick -> Inter thresholds
+    # =========================================================
+
+    slick_hold_warming_cpm: float = +0.35
+    # Wenn TrackTemp so schnell steigt, darf man Slick evtl. halten.
+
+    slick_hold_max_wetness: float = 0.82
+    # Obergrenze der Wetness, unter der man evtl. noch auf Slick bleibt.
+
+    slick_hard_weather_enum: int = 4
+    # Ab diesem Weather-Enum (>=4) gilt Slick als unsicher.
+
+    slick_hard_wetness: float = 0.88
+    # Harte Wetness-Grenze: darüber sofort Inter.
+
+    slick_delta_is_box: float = -0.30
+    # Wenn Inter pro Runde so viel schneller ist, sofort boxen.
+
+    # =========================================================
+    # 5) Wet <-> Inter payback (W-I) thresholds
+    # =========================================================
+
+    wi_delta_min: float = 0.05
+    # Mindest-Pace-Differenz, um einen Wechsel überhaupt zu erwägen.
+
+    wi_payback_min_gain: float = 0.10
+    # Mindest-Gewinn pro Runde, um Payback zu berechnen.
+
+    wi_fast_gain: float = 0.45
+    # Ab diesem Gain gilt der Wechsel als „sehr lohnend“ → Box in 1.
+
+    # =========================================================
+    # 6) Inter -> Slick (dry exit) thresholds
+    # =========================================================
+
+    dry_track_warming_cpm: float = +0.25
+    # TrackTemp-Anstieg, der als „trocknet ab“ gilt.
+
+    dry_track_warming_fast_cpm: float = +0.40
+    # Sehr schneller Anstieg → starkes Dry-Signal.
+
+    dry_track_temp_ok_c: float = 24.0
+    # Ab dieser TrackTemp sind Slicks grundsätzlich nutzbar (C3/C4).
+
+    dry_track_temp_very_ok_c: float = 27.0
+    # Ab hier sind auch härtere Slicks realistisch.
+
+    dry_rain_now_low: float = 18.0
+    # Soft-Grenze für rain_now, unter der Regen ignoriert werden darf.
+
+    dry_rain_next_low: float = 12.0
+    # Grenze für rain_next, die „es kommt nichts mehr“ signalisiert.
+
+    dry_hard_wetness_max: float = 0.20
+    # Wetness-Grenze für sofortigen Inter->Slick-Hard-Exit.
+
+    dry_hard_conf_min: float = 0.58
+    # Mindest-Confidence für Hard-Exit.
+
+    dry_temp_conf_min: float = 0.55
+    # Mindest-Confidence für temperaturgetriebenen Exit.
+
+    dry_temp_wetness_max: float = 0.60
+    # Max-Wetness, bei der Temp-Exit noch erlaubt ist.
+
+    # ---------------------------------------------------------
+    # forecast gates (absolute envelope)
+    # ---------------------------------------------------------
+
+    fc_dry_3: int = 20
+    fc_dry_5: int = 25
+    fc_dry_10: int = 30
+    # Maximale Regenwerte, die „sicher trocken genug“ bedeuten.
+
+    fc_very_dry_3: int = 8
+    fc_very_dry_5: int = 10
+    fc_very_dry_10: int = 15
+    # Sehr konservative Trocken-Grenzen.
+
+    fc_ultra_3: int = 10
+    fc_ultra_5: int = 10
+    fc_ultra_10: int = 10
+    fc_ultra_15: int = 5
+    fc_ultra_20: int = 5
+    # Ultra-dry Override: „Strecke ist faktisch trocken, egal was rain_now sagt“.
+
+    # =========================================================
+    # 7) Guards
+    # =========================================================
+
+    avoid_refresh_min_lr: int = 3
+    # Unter dieser Rest-Rundenanzahl werden unnötige Reifenwechsel vermieden.
+
+    short_rain_try_stay_wetness_max: float = 0.80
+    # Wenn Wetness darunter liegt und Regen kurz ist, bleib auf Slick.
+
+
 
 class RainEngine:
     """
