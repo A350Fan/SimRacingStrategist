@@ -62,4 +62,3 @@ class Translator:
             "pt": "Português",
             "lk": "සිංහල"
         }
-

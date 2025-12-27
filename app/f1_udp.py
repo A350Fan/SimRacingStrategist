@@ -2591,6 +2591,3 @@ class F1UDPReplayListener(F1UDPListener):
         # NOTE: Implemented by moving the existing pid-chain into this method in LIVE too.
         # If you haven't moved it yet, do that step below (2.6).
         return self._handle_packet(pid, hdr, data)
-
-
-
