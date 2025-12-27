@@ -59,10 +59,14 @@ class F1LiveState:
 
     # Player meta (you already set these in _update_field_metrics_and_emit)
     player_car_index: Optional[int] = None
-    player_tyre_cat: Optional[str] = None   # "SLICK" / "INTER" / "WET"
-    player_team_id: Optional[int] = None    # from Participants packet (pid=4)
-    player_team_name: Optional[str] = None
+    player_tyre_cat: Optional[str] = None  # "SLICK" / "INTER" / "WET"
 
+    # NEW: exact compound label for slicks ("C1".."C6"), otherwise same as category ("INTER"/"WET").
+    # Intended for lap DB + later strategy logic. Keep player_tyre_cat as the coarse class.
+    player_tyre_compound: Optional[str] = None
+
+    player_team_id: Optional[int] = None  # from Participants packet (pid=4)
+    player_team_name: Optional[str] = None
 
     # NOTE: inter_share bleibt aus Kompatibilitätsgründen = Anteil (INTER+WET) von (SLICK+INTER+WET)
     inter_share: Optional[float] = None
@@ -222,6 +226,9 @@ class F1UDPListener:
 
         self._last_lap_ms = [None] * 22
         self._tyre_cat = [None] * 22  # "SLICK" / "INTER" / "WET"
+
+        # NEW: exact label used for DB ("C1".."C6" for slicks, else "INTER"/"WET"/"SLICK").
+        self._tyre_compound = [None] * 22
 
         # --- Active cars detection (LapData: resultStatus) ---
         # 0 invalid, 1 inactive, 2 active, 3 finished, ...
@@ -1097,16 +1104,19 @@ class F1UDPListener:
                     continue
 
                 if visual == 8:
-
                     tyre_cat = "WET"
-
                 elif visual == 7:
-
                     tyre_cat = "INTER"
-
                 else:
-
                     tyre_cat = "SLICK"
+
+                # NEW: exact compound label for DB/strategy (C1..C6 for slicks)
+                try:
+                    self._tyre_compound[i] = self._compound_label(
+                        actual=int(actual), visual=int(visual), tyre_cat=tyre_cat
+                    )
+                except Exception:
+                    self._tyre_compound[i] = tyre_cat
 
                 now = time.monotonic()
                 self._tyre_last_seen[i] = now
@@ -2161,6 +2171,11 @@ class F1UDPListener:
         self.state.player_car_index = pidx
         self.state.player_tyre_cat = self._tyre_cat[pidx] if (0 <= pidx < len(self._tyre_cat)) else None
 
+        # NEW: exact tyre label (C1..C6 for slicks) for DB / future strategy.
+        self.state.player_tyre_compound = (
+            self._tyre_compound[pidx] if (0 <= pidx < len(self._tyre_compound)) else None
+        )
+
         # --- Field Δ(I-S) computed per-driver (prevents Norris vs Gasly bias) ---
         deltas = []
         for i in range(22):
@@ -2324,6 +2339,47 @@ class F1UDPListener:
                 pass
 
         return profile
+
+    def _compound_label(self, *, actual: int | None, visual: int | None, tyre_cat: str) -> str:
+        """Return exact tyre label for DB.
+
+        - For INTER/WET: returns "INTER"/"WET".
+        - For slicks: tries to map to "C1".."C6" using known Codemasters codes.
+          Falls back to "SLICK" if unknown.
+
+        NOTE: We keep player_tyre_cat as coarse class (SLICK/INTER/WET) for rain logic.
+        """
+        cat = (tyre_cat or "").upper().strip()
+        if cat in ("INTER", "WET"):
+            return cat
+
+        # prefer visual code (what the UI shows) when it looks like a slick compound
+        code = None
+        try:
+            v = int(visual) if visual is not None else None
+            if v is not None:
+                code = v
+        except Exception:
+            code = None
+
+        if code is None:
+            try:
+                code = int(actual) if actual is not None else None
+            except Exception:
+                code = None
+
+        # Common patterns across recent F1 UDP specs:
+        # - 16..21 => slick compounds (we map 16->C1, ..., 21->C6)
+        # - 0..5   => sometimes used in older profiles (map 0->C1, ..., 5->C6)
+        try:
+            if code is not None and 16 <= int(code) <= 21:
+                return f"C{int(code) - 15}"
+            if code is not None and 0 <= int(code) <= 5:
+                return f"C{int(code) + 1}"
+        except Exception:
+            pass
+
+        return "SLICK"
 
 
 # FUTURE/WIP: Robust parser for "rain next" extraction from Session packets without fixed offsets.

@@ -800,9 +800,15 @@ class MainWindow(QtWidgets.QMainWindow):
         }
         weather_label = weather_map.get(int(weather_enum), "Unknown") if weather_enum is not None else "Unknown"
 
-        tyre_cat = (getattr(state, "player_tyre_cat", None) or "").upper().strip()
-        if tyre_cat not in ("SLICK", "INTER", "WET"):
-            tyre_cat = ""
+        # Coarse class for rain engine: SLICK/INTER/WET
+        tyre_class = (getattr(state, "player_tyre_cat", None) or "").upper().strip()
+        if tyre_class not in ("SLICK", "INTER", "WET"):
+            tyre_class = ""
+
+        # Exact label for DB/strategy: C1..C6 for slicks, else INTER/WET.
+        tyre_label = (getattr(state, "player_tyre_compound", None) or "").upper().strip()
+        if not tyre_label:
+            tyre_label = tyre_class
 
         # Session type from UDP (coarse P/Q/R/TT). Keep old fallback to "R".
         session_label = self._session_label_from_udp(getattr(state, "session_type_id", None)) or "R"
@@ -827,7 +833,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "session": session_label,
             "session_uid": str(sess_uid),
             "weather": weather_label,
-            "tyre": tyre_cat,
+            "tyre": tyre_label,
             "lap_time_s": lap_time_s,
 
             # NEW (additive): pulled from UDP state if available
@@ -853,7 +859,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     "session_uid": str(sess_uid),
                     "lap_n": lap_n if lap_n is not None else "",
                     "lap_time_s": lap_time_s,
-                    "tyre": tyre_cat,
+                    "tyre": tyre_label,
                     "weather": weather_label,
                     "source": source,
                 })
@@ -954,7 +960,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # ---- other metadata ----
             sess_uid = getattr(state, "session_uid", None) or "nosess"
-            tyre = getattr(state, "player_tyre_cat", None)
+            # Write exact compound label into CSV for later strategy work.
+            # Keep class separately to not break rain logic / debugging.
+            tyre_class = getattr(state, "player_tyre_cat", None)
+            tyre = getattr(state, "player_tyre_compound", None) or tyre_class
             weather = getattr(state, "weather", None)
 
             rain_now = getattr(state, "rain_now_pct", None)
@@ -1019,6 +1028,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "sector2_ms",
                 "sector3_ms",
                 "tyre_cat",
+                "tyre_class",
                 "weather_enum",
                 "rain_now_pct",
                 "rain_fc_pct",
@@ -1054,6 +1064,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 "" if s2 is None else int(s2),
                 "" if s3 is None else int(s3),
                 "" if tyre is None else str(tyre),
+                "" if weather is None else int(weather),
                 "" if weather is None else int(weather),
                 "" if rain_now is None else int(rain_now),
                 "" if rain_fc is None else int(rain_fc),
