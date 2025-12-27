@@ -2372,10 +2372,22 @@ class F1UDPListener:
         # - 16..21 => slick compounds (we map 16->C1, ..., 21->C6)
         # - 0..5   => sometimes used in older profiles (map 0->C1, ..., 5->C6)
         try:
-            if code is not None and 16 <= int(code) <= 21:
-                return f"C{int(code) - 15}"
-            if code is not None and 0 <= int(code) <= 5:
-                return f"C{int(code) + 1}"
+            pf = int(getattr(self.state, "packet_format", 0) or 0)
+
+            c = int(code) if code is not None else None
+            if c is not None and 16 <= c <= 21:
+                # F1 25: observed mapping appears inverted (e.g. code 16 == C6)
+                if pf >= 2025:
+                    return f"C{22 - c}"  # 16->C6 ... 21->C1
+                else:
+                    return f"C{c - 15}"  # legacy: 16->C1 ... 21->C6
+
+            if c is not None and 0 <= c <= 5:
+                # Older range; keep legacy unless you confirm it's inverted there too
+                if pf >= 2025:
+                    return f"C{6 - c}"  # 0->C6 ... 5->C1
+                else:
+                    return f"C{c + 1}"  # 0->C1 ... 5->C6
         except Exception:
             pass
 
