@@ -109,6 +109,18 @@ class F1LiveState:
     player_pit_status: Optional[int] = None
     player_current_lap_num: Optional[int] = None
 
+    # --- NEW (additive): fuel + tyre wear for lap database ---
+    # fuel: typically kg in Codemasters UDP
+    player_fuel_in_tank: Optional[float] = None
+    player_fuel_capacity: Optional[float] = None
+    player_fuel_remaining_laps: Optional[float] = None
+
+    # wear values stored as "remaining %" (100 = new, 0 = dead)
+    player_wear_fl: Optional[float] = None
+    player_wear_fr: Optional[float] = None
+    player_wear_rl: Optional[float] = None
+    player_wear_rr: Optional[float] = None
+
     # --- Field meta ---
     field_total_cars: Optional[int] = None
     unknown_tyre_count: Optional[int] = None
@@ -1051,9 +1063,35 @@ class F1UDPListener:
                     # Save player-specific FIA flag (blue/yellow/green/none)
                     player_idx = int(hdr.get("playerCarIndex", 0))
                     if i == player_idx:
+                        # FIA flag (existing)
                         if self.state.player_fia_flag != int(fia_flag):
                             self.state.player_fia_flag = int(fia_flag)
                             changed = True
+
+                        # --- NEW: fuel (additive, best-effort) ---
+                        try:
+                            fin = float(_fuel_in_tank)
+                            if self.state.player_fuel_in_tank != fin:
+                                self.state.player_fuel_in_tank = fin
+                                changed = True
+                        except Exception:
+                            pass
+
+                        try:
+                            fcap = float(_fuel_cap)
+                            if self.state.player_fuel_capacity != fcap:
+                                self.state.player_fuel_capacity = fcap
+                                changed = True
+                        except Exception:
+                            pass
+
+                        try:
+                            frem = float(_fuel_rem_laps)
+                            if self.state.player_fuel_remaining_laps != frem:
+                                self.state.player_fuel_remaining_laps = frem
+                                changed = True
+                        except Exception:
+                            pass
 
                 except struct.error:
                     continue
@@ -1110,6 +1148,73 @@ class F1UDPListener:
 
             if changed:
                 self._dirty = True
+
+        elif pid == 10:
+            # --- NEW (additive): tyre wear from CarDamage packet ---
+            # We only decode the first 4 floats (tyresWear) per car.
+            base = int(hdr.get("headerSize", 29))
+            remaining = len(data) - base
+            if remaining <= 0:
+                return
+
+            # In most games the per-car struct is stable; we only need first 16 bytes anyway.
+            car_size = remaining // 22
+            if car_size < 16:
+                return
+
+            pidx = int(hdr.get("playerCarIndex", 0))
+            if not (0 <= pidx < 22):
+                return
+
+            off = base + pidx * car_size
+            if off + 16 > len(data):
+                return
+
+            changed = False
+            try:
+                # order in spec comments often differs; we keep consistent mapping as FL, FR, RL, RR
+                w1, w2, w3, w4 = struct.unpack_from("<ffff", data, off)
+
+                def _to_remaining(x: float) -> Optional[float]:
+                    try:
+                        xv = float(x)
+                    except Exception:
+                        return None
+                    # x is "wear %" (0=new -> 100=dead) in many specs
+                    if xv < 0.0 or xv > 100.0:
+                        return None
+                    rem = 100.0 - xv
+                    if rem < 0.0:
+                        rem = 0.0
+                    if rem > 100.0:
+                        rem = 100.0
+                    return rem
+
+                r1 = _to_remaining(w1)
+                r2 = _to_remaining(w2)
+                r3 = _to_remaining(w3)
+                r4 = _to_remaining(w4)
+
+                if r1 is not None and self.state.player_wear_fl != r1:
+                    self.state.player_wear_fl = r1
+                    changed = True
+                if r2 is not None and self.state.player_wear_fr != r2:
+                    self.state.player_wear_fr = r2
+                    changed = True
+                if r3 is not None and self.state.player_wear_rl != r3:
+                    self.state.player_wear_rl = r3
+                    changed = True
+                if r4 is not None and self.state.player_wear_rr != r4:
+                    self.state.player_wear_rr = r4
+                    changed = True
+
+            except Exception:
+                pass
+
+            if changed:
+                self._dirty = True
+
+            self._maybe_emit()
 
         self._maybe_emit()
 

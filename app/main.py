@@ -773,19 +773,31 @@ class MainWindow(QtWidgets.QMainWindow):
         # IMPORTANT: source_file must be unique
         source = f"udp://{sess_uid}/lap{lap_n if lap_n is not None else 'x'}/t{last_ms}"
 
+        # Game label best-effort (keeps old behavior if unknown)
+        gy = getattr(state, "game_year", None)
+        game_label = "F1 25"
+        try:
+            if int(gy) == 20:
+                game_label = "F1 2020"
+        except Exception:
+            pass
+
         summ = {
-            "game": "F1 25",
+            "game": game_label,
             "track": track_label,
             "session": session_label,
             "session_uid": str(sess_uid),
             "weather": weather_label,
             "tyre": tyre_cat,
             "lap_time_s": lap_time_s,
-            "fuel_load": None,
-            "wear_fl": None,
-            "wear_fr": None,
-            "wear_rl": None,
-            "wear_rr": None,
+
+            # NEW (additive): pulled from UDP state if available
+            "fuel_load": getattr(state, "player_fuel_in_tank", None),
+
+            "wear_fl": getattr(state, "player_wear_fl", None),
+            "wear_fr": getattr(state, "player_wear_fr", None),
+            "wear_rl": getattr(state, "player_wear_rl", None),
+            "wear_rr": getattr(state, "player_wear_rr", None),
         }
 
         upsert_lap(source, summ)
