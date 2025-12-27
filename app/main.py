@@ -854,34 +854,43 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _append_udp_minisector_lap_csv(self, state: F1LiveState, lap: dict) -> None:
         """
-        One file per completed lap:
-        <session>_<team>_<lap>_<laptime>_<timestamp>.csv
+        One file per completed lap (your custom format):
+
+        Folder: <output_root>/<Track>/
+        Filename: <session>_<team>_lap<lap>_t<laptime_ms>_<timestamp>.csv
 
         CSV contains ONE row (wide format) with metadata + MS01..MS30.
-        Additive: never breaks existing logic; failures are swallowed.
+
+        Additive + safe:
+        - Does not affect Iko/Overtake CSV import.
+        - Missing values are written as empty cells.
         """
         try:
             out_root = (getattr(self.cfg, "udp_output_root", "") or "").strip()
             if not out_root:
-                # If user didn't choose output folder, do nothing (same behavior as laps.csv writer)
                 return
 
             base = Path(out_root)
             base.mkdir(parents=True, exist_ok=True)
 
-            # --- Track folder (sorted by track name) ---
+            # ---- track folder ----
             track_id = getattr(state, "track_id", None)
-            track_label = track_label_from_id(track_id)  # pretty name or TrackId:<n>
-
-            # Windows-safe folder name
+            track_label = track_label_from_id(track_id)
             track_dir = base / self._safe_token(track_label, fallback="UnknownTrack")
             track_dir.mkdir(parents=True, exist_ok=True)
 
-            # --- filename parts ---
-            sess_uid = getattr(state, "session_uid", None) or "nosess"
+            # ---- session label (P/Q/R) from UDP session_type_id ----
+            st = getattr(state, "session_type_id", None)
+            if st == 1:
+                session_label = "P"
+            elif st == 2:
+                session_label = "Q"
+            elif st == 3:
+                session_label = "R"
+            else:
+                session_label = ""  # unknown
 
-            # TEAM: not available yet in F1LiveState -> placeholder until we wire Participants packet
-            # Later we can set state.player_team or similar and this will auto-fill.
+            # ---- team ----
             team = getattr(state, "player_team_name", None)
             if not team:
                 tid = getattr(state, "player_team_id", None)
@@ -894,20 +903,15 @@ class MainWindow(QtWidgets.QMainWindow):
             ts_token = ts_utc.strftime("%Y%m%dT%H%M%SZ")
 
             fn = (
-                f"{self._safe_token(track_label)}_"
+                f"{self._safe_token(session_label or 'NA')}_"
                 f"{self._safe_token(team)}_"
                 f"lap{self._safe_token(lap_num)}_"
                 f"t{self._fmt_laptime_token(lap_time_ms)}_"
                 f"{ts_token}.csv"
             )
-
             out_path = track_dir / fn
 
-            # --- collect data (wide row) ---
-            track_id = getattr(state, "track_id", None)
-            track_label = track_label_from_id(track_id)
-
-            # sector times (best-effort)
+            # ---- sector times (best-effort) ----
             s1 = getattr(state, "player_sector1_time_ms", None)
             s2 = getattr(state, "player_sector2_time_ms", None)
             s3 = None
@@ -917,14 +921,28 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception:
                 s3 = None
 
+            # ---- other metadata ----
+            sess_uid = getattr(state, "session_uid", None) or "nosess"
             tyre = getattr(state, "player_tyre_cat", None)
             weather = getattr(state, "weather", None)
+
             rain_now = getattr(state, "rain_now_pct", None)
             rain_fc = getattr(state, "rain_fc_pct", None)
+
             sc = getattr(state, "safety_car_status", None)
             track_flag = getattr(state, "track_flag", None)
             player_flag = getattr(state, "player_fia_flag", None)
 
+            # ---- fuel + wear (NEW) ----
+            fuel_in_tank = getattr(state, "player_fuel_in_tank", None)
+            fuel_remaining_laps = getattr(state, "player_fuel_remaining_laps", None)
+
+            wear_fl = getattr(state, "player_wear_fl", None)
+            wear_fr = getattr(state, "player_wear_fr", None)
+            wear_rl = getattr(state, "player_wear_rl", None)
+            wear_rr = getattr(state, "player_wear_rr", None)
+
+            # ---- minisector completion ----
             complete = int(bool(lap.get("complete")))
             missing = lap.get("missing") or []
             missing_str = ",".join(str(x) for x in missing)
@@ -932,8 +950,7 @@ class MainWindow(QtWidgets.QMainWindow):
             minis = (lap.get("minis") or [])
             total_minis = int(lap.get("total_minis") or 30)
 
-            # ms_no -> split_ms
-            ms_map = {}
+            ms_map: dict[int, int | str] = {}
             minis_sum = 0
             for m in minis:
                 no = m.get("ms_no")
@@ -949,8 +966,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
             ms_cols = [f"MS{n:02d}_ms" for n in range(1, total_minis + 1)]
 
+            # ---- game label (best-effort) ----
+            game_label = "F1 25"
+            try:
+                if int(getattr(state, "game_year", 25)) == 20:
+                    game_label = "F1 2020"
+            except Exception:
+                pass
+
             cols = [
                 "created_at_utc",
+                "game",
+                "session",
                 "session_uid",
                 "team",
                 "track_id",
@@ -967,6 +994,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 "safety_car_status",
                 "track_flag",
                 "player_fia_flag",
+
+                # NEW:
+                "fuel_in_tank",
+                "fuel_remaining_laps",
+                "wear_fl_pct",
+                "wear_fr_pct",
+                "wear_rl_pct",
+                "wear_rr_pct",
+
                 "complete",
                 "missing_minisectors",
                 "minis_sum_ms",
@@ -975,6 +1011,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
             row = [
                 ts_utc.isoformat(timespec="seconds"),
+                game_label,
+                session_label,
                 str(sess_uid),
                 str(team),
                 "" if track_id is None else int(track_id),
@@ -991,6 +1029,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 "" if sc is None else int(sc),
                 "" if track_flag is None else int(track_flag),
                 "" if player_flag is None else int(player_flag),
+
+                # NEW:
+                "" if fuel_in_tank is None else float(fuel_in_tank),
+                "" if fuel_remaining_laps is None else float(fuel_remaining_laps),
+                "" if wear_fl is None else float(wear_fl),
+                "" if wear_fr is None else float(wear_fr),
+                "" if wear_rl is None else float(wear_rl),
+                "" if wear_rr is None else float(wear_rr),
+
                 complete,
                 missing_str,
                 minis_sum,
@@ -999,7 +1046,6 @@ class MainWindow(QtWidgets.QMainWindow):
             for n in range(1, total_minis + 1):
                 row.append(ms_map.get(n, ""))
 
-            # write single-row CSV
             with out_path.open("w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f)
                 w.writerow(cols)
@@ -1539,6 +1585,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.logger.info(f"Cached as: {cached}")
 
         try:
+            # 1) NEW: try your own UDP lap CSV format first
+            if self._import_own_udp_lap_csv(src, cached):
+                QtCore.QMetaObject.invokeMethod(self, "_after_db_update", QtCore.Qt.QueuedConnection)
+                return
+
+            # 2) legacy: Iko/Overtake CSV import (unchanged)
             parsed = parse_overtake_csv(cached)
             summ = lap_summary(parsed)
             try:
@@ -1816,6 +1868,86 @@ class MainWindow(QtWidgets.QMainWindow):
                 w.writerow({k: row.get(k, "") for k in cols})
         except Exception:
             pass
+
+    def _is_own_udp_lap_csv(self, path: Path) -> bool:
+        """
+        Detect your custom one-lap wide CSV format (minisectors).
+        Safe/cheap check: only reads the header line.
+        """
+        try:
+            with path.open("r", encoding="utf-8", newline="") as f:
+                header = f.readline().strip().lower()
+            # strong signals for your format
+            return ("created_at_utc" in header and "minis_sum_ms" in header) or ("ms01_ms" in header)
+        except Exception:
+            return False
+
+    def _import_own_udp_lap_csv(self, src: Path, cached: Path) -> bool:
+        """
+        Import your custom UDP lap CSV into DB.
+        Returns True if it was your format and import succeeded (or at least attempted).
+        """
+        if not self._is_own_udp_lap_csv(cached):
+            return False
+
+        try:
+            with cached.open("r", encoding="utf-8", newline="") as f:
+                r = csv.DictReader(f)
+                row = next(r, None)
+
+            if not row:
+                return True  # recognized format, but empty
+
+            # mandatory-ish fields
+            track = (row.get("track") or "").strip() or "Unknown"
+            session = (row.get("session") or "").strip()  # "P"/"Q"/"R" or ""
+            session_uid = str(row.get("session_uid") or "nosess")
+
+            # lap time
+            lap_time_s = None
+            try:
+                if row.get("lap_time_ms"):
+                    lap_time_s = float(row["lap_time_ms"]) / 1000.0
+            except Exception:
+                lap_time_s = None
+
+            tyre = (row.get("tyre_cat") or "").strip()
+            weather = row.get("weather_enum")
+
+            # fuel + wear (optional)
+            def _f(key):
+                try:
+                    v = row.get(key, "")
+                    return None if v in ("", None) else float(v)
+                except Exception:
+                    return None
+
+            summ = {
+                "game": (row.get("game") or "F1").strip(),
+                "track": track,
+                "session": session,
+                "session_uid": session_uid,
+                "weather": ("" if weather in ("", None) else str(weather)),
+                "tyre": tyre,
+                "lap_time_s": lap_time_s,
+
+                "fuel_load": _f("fuel_in_tank"),
+                "wear_fl": _f("wear_fl_pct"),
+                "wear_fr": _f("wear_fr_pct"),
+                "wear_rl": _f("wear_rl_pct"),
+                "wear_rr": _f("wear_rr_pct"),
+            }
+
+            upsert_lap(str(src), summ)
+            return True
+        except Exception as e:
+            # still "recognized", so return True to avoid trying to parse as Iko CSV
+            try:
+                self.logger.error(f"OWN UDP CSV import failed for {src.name}: {type(e).__name__}: {e}")
+            except Exception:
+                pass
+            return True
+
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
