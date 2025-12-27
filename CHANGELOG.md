@@ -1,0 +1,58 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on *Keep a Changelog*, and the project follows
+Semantic Versioning (in an early 0.x stage).
+
+---
+
+## [Unreleased]
+
+### Added
+- (add upcoming features here)
+
+### Changed
+- (add behavioural changes here)
+
+### Fixed
+- (add bug fixes here)
+
+---
+
+## [0.1.0] - 2025-12-27
+
+### Added
+- Live UDP telemetry support for **F1 25**
+- Automatic detection of supported F1 games (profile-based system)
+- Minisector tracking (30 minisectors per lap) for F1 25
+- Robust MS30 detection (end-of-lap fix)
+- Flashback / rollback-safe minisector logic
+- Fallback sector logic for older F1 titles (e.g. F1 2020)
+
+- CSV import (compatible with Overtake Telemetry Tool)
+- Automatic detection of new or updated CSV files (folder watcher)
+- Persistent storage via SQLite (WAL mode) with automatic schema migration
+- Session UID support (overflow-safe)
+- Track-based aggregations and historical lap storage
+
+- RainEngine (stateful decision engine) for tyre crossover decisions:
+  - Slick ↔ Inter
+  - Inter ↔ Wet
+- Multi-signal fusion for decisions:
+  - field tyre distribution
+  - pace deltas (Inter–Slick / Wet–Inter)
+  - weather state & rain forecast
+  - track and air temperature trends
+- Hysteresis and lockout system to prevent flip-flopping
+- Payback-based pit stop evaluation
+- Safety Car awareness
+
+- Stint reconstruction from historical lap data
+- Tyre wear models per track and compound
+- Degradation estimation (wear per lap, pace loss vs wear, max stint length)
+- Pit window helpers (one-stop and two-stop)
+
+- Multilingual support (JSON-based i18n): EN, DE, FR, IT, ES, PT, Sinhala
+- Centralized logging (UI + file)
+- Configurable application settings
+- Platform-neutral application directories (config/cache/db/log)

@@ -27,3 +27,5 @@ Thumbs.db
 # Local secrets
 .env
 .env.*
+
+index.html
