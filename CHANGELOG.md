@@ -16,6 +16,13 @@ Semantic Versioning (in an early 0.x stage).
 
 ### Fixed
 - None
+
+---
+## [0.2.0] - 2025-12-27
+
+### Added
+- full standalone CSV writing and tracking
+  - separate CSV writing telemetry tools are no longer mandatory, but can still be used as alternative
 ---
 ## [0.1.3] - 2025-12-27
 
