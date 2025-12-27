@@ -40,11 +40,12 @@ or derived from any third-party telemetry tools.
 2. Navigate to the project directory and install dependencies (example using PowerShell):
 
 ```powershell
-cd SimRaceStrategist
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+cd SimRacingStrategist-<versionnumber>        (e.g. 0.1.1)
 
+py -m venv .venv
+
+.\.venv\Scripts\python -m pip install --upgrade pip
+.\.venv\Scripts\python -m pip install -r requirements.txt
 ```
 
 3. Start the application using the provided launcher: "Start_SimRaceStrategist.bat"
@@ -126,7 +127,6 @@ Next steps:
 - Expand live delta calculations (minisector-based where possible)
 - Improve multi-game compatibility (F1 24 → F1 2017) and track/ID coverage
 - Add a dedicated Safety Car decision panel (Box / Stay / Opposite) based on estimated delta
-
 
 ---
 
