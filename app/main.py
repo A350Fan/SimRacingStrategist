@@ -10,7 +10,7 @@ from app.watcher import FolderWatcher
 from app.overtake_csv import parse_overtake_csv, lap_summary
 from app.db import upsert_lap, latest_laps, lap_counts_by_track, distinct_tracks, laps_for_track
 from app.strategy import generate_placeholder_cards
-from app.f1_udp import F1UDPListener, F1LiveState
+from app.f1_udp import F1UDPListener, F1UDPReplayListener, F1LiveState
 from app.logging_util import AppLogger
 from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop, recommend_rain_pit, RainPitAdvice
 from app.rain_engine import RainEngine
@@ -615,7 +615,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # udp
         if self.cfg.udp_enabled:
-            self.udp = F1UDPListener(self.cfg.udp_port, self._on_live_state, debug=self.cfg.udp_debug)
+            src = str(getattr(self.cfg, "udp_source", "LIVE") or "LIVE").strip().upper()
+            replay_file = str(getattr(self.cfg, "udp_replay_file", "") or "").strip()
+
+            if src == "REPLAY" and replay_file:
+                speed = float(getattr(self.cfg, "udp_replay_speed", 1.0) or 1.0)
+                self.udp = F1UDPReplayListener(replay_file, self._on_live_state, speed=speed, debug=self.cfg.udp_debug)
+            else:
+                self.udp = F1UDPListener(self.cfg.udp_port, self._on_live_state, debug=self.cfg.udp_debug)
+
             self.udp.start()
 
     def _stop_services(self):
