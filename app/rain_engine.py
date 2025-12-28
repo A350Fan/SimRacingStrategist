@@ -823,7 +823,7 @@ class RainEngine:
 
                         # - wetness decreasing (wet_score) + forecast improving
 
-                        drying_now = (wet_score <= 0.72 and conf >= 0.55)
+                        drying_now = (wet_score <= 0.72 and conf >= p.dry_temp_conf_min)
 
                         forecast_dry = False
 
