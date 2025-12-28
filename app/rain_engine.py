@@ -597,9 +597,9 @@ class RainEngine:
 
         # 1) RainNow rising or non-trivial already
         if rain_now_med is not None:
-            if rain_now_med >= 18:
+            if rain_now_med >= p.cond_rain_now_on:
                 cond_shift = True
-                cond_reason.append("rain_now>=18")
+                cond_reason.append(f"rain_now>={p.cond_rain_now_on:g}")
         # 2) Track temp dropping quickly (often rain onset)
         if track_slope_cpm is not None:
             if track_slope_cpm <= -0.45:  # °C/min drop
@@ -607,12 +607,12 @@ class RainEngine:
                 cond_reason.append("trackTemp_drop")
         # 3) Pace delta turning against slicks (inter faster) -> strong shift
         if delta_is_med is not None:
-            if delta_is_med <= -0.25:
+            if delta_is_med <= p.cond_delta_is_on:
                 cond_shift = True
-                cond_reason.append("Δ(I-S)<=-0.25")
+                cond_reason.append(f"ΔIS<={p.cond_delta_is_on:g}")
         # 4) Forecast ramp (rain increases fast in next 5 min)
         if rain_3 is not None and rain_5 is not None:
-            if (rain_5 - rain_3) >= 18:
+            if (rain_5 - rain_3) >= p.cond_fc_ramp_3to5:
                 cond_shift = True
                 cond_reason.append("fc_ramp_3to5")
 
@@ -623,7 +623,7 @@ class RainEngine:
         # This does NOT force a switch; it just makes the wet-mode trigger a bit more responsive.
         shift_boost = 0.0
         if cond_shift:
-            shift_boost = 0.08  # small: avoid overreacting
+            shift_boost = p.shift_boost  # small: avoid overreacting
             wetness = _clamp01(wetness + shift_boost)
             conf = _clamp01(conf + 0.05)
 
@@ -695,8 +695,8 @@ class RainEngine:
 
                 # Track temperature trend (°C/min)
                 track_slope_cpm = self._slope_c_per_min(self._track_temp, window_s=90.0)
-                track_falling_fast = (track_slope_cpm is not None and track_slope_cpm <= -0.45)
-                track_rising_fast = (track_slope_cpm is not None and track_slope_cpm >= +0.35)
+                track_falling_fast = (track_slope_cpm is not None and track_slope_cpm <= p.cond_track_drop_cpm)
+                track_rising_fast = (track_slope_cpm is not None and track_slope_cpm >= p.slick_hold_warming_cpm)
 
                 # Weather enum (0–5)
                 w_enum = int(weather_med) if weather_med is not None else None
@@ -732,7 +732,7 @@ class RainEngine:
                     # Kurzer Schauer / evtl. aussitzen
                     if (
                             track_rising_fast
-                            and wetness < 0.82
+                            and wetness < p.slick_hold_max_wetness
                             and not under_sc
                             and laps_remaining > 3
                             and (delta_is_med is None or delta_is_med > -0.8)
@@ -740,8 +740,8 @@ class RainEngine:
                         advice = stay("Track warming again → try to stay out on slick.")
                     else:
                         # Harte Trigger → sofort reagieren
-                        hard_weather = (w_enum is not None and w_enum >= 4)
-                        hard_wetness = (wetness >= 0.88)
+                        hard_weather = (w_enum is not None and w_enum >= p.slick_hard_weather_enum)
+                        hard_wetness = (wetness >= p.slick_hard_wetness)
 
                         if hard_weather or hard_wetness or cond_shift:
                             advice = box_in(
@@ -751,7 +751,7 @@ class RainEngine:
                             )
                         else:
                             # Pace-Trigger
-                            if delta_is_med is not None and delta_is_med < -0.30:
+                            if delta_is_med is not None and delta_is_med < p.slick_delta_is_box:
                                 advice = box_in(1, "Intermediate", "Δpace(I-S): Inter faster.")
                             else:
                                 n = 1 if wetness > 0.80 else 2
