@@ -796,10 +796,8 @@ class RainEngine:
 
                     # Use this to avoid switching too early back to Inters.
 
-                    if delta_wi_med is not None and float(delta_wi_med) > 0.05:
-
-                        inter_gain_per_lap = max(0.0, float(delta_wi_med))  # (W-I) positive => Inter faster
-
+                    if delta_wi_med is not None and float(delta_wi_med) > p.wi_delta_min:
+                        inter_gain_per_lap = max(0.0, float(delta_wi_med))
                         buffer_laps = 0 if under_sc else 1
 
                         laps_to_payback = int((pit_loss_s / max(0.10, inter_gain_per_lap)) + 0.999)  # ceil
