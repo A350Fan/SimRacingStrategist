@@ -772,7 +772,7 @@ class RainEngine:
                         laps_to_payback = int(
                             (pit_loss_s / max(p.wi_payback_min_gain, wet_gain_per_lap)) + 0.999)  # ceil
                         if laps_remaining >= (laps_to_payback + buffer_laps + 1):
-                            n = 1 if under_sc or wet_gain_per_lap >= 0.45 else 2
+                            n = 1 if under_sc or wet_gain_per_lap >= p.wi_fast_gain else 2
                             advice = box_in(
                                 n,
                                 "Wet",
