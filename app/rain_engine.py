@@ -769,7 +769,8 @@ class RainEngine:
                         wet_gain_per_lap = max(0.0, -float(delta_wi_med))
                         # conservative: require some headroom (buffer laps) unless SC makes it cheap
                         buffer_laps = 0 if under_sc else 1
-                        laps_to_payback = int((pit_loss_s / max(0.10, wet_gain_per_lap)) + 0.999)  # ceil
+                        laps_to_payback = int(
+                            (pit_loss_s / max(p.wi_payback_min_gain, wet_gain_per_lap)) + 0.999)  # ceil
                         if laps_remaining >= (laps_to_payback + buffer_laps + 1):
                             n = 1 if under_sc or wet_gain_per_lap >= 0.45 else 2
                             advice = box_in(
