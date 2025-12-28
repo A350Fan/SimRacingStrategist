@@ -26,19 +26,20 @@ Further validation with different FPS / UDP tick rates, possibly introducing a t
 
 ---
 
-### KI-002 – Minisector tracking unstable during flashbacks
+### KI-002 – Minisector tracking unstable
 **Affected version(s):** v0.1.0 - v0.2.0   
 **Affected modules:** MiniSectorTracker  
 
 **Description:**  
 When using flashbacks, minisectors may be overwritten or counted twice if lap time and lap distance do not rewind consistently.
+When restarting a session, every minisector is filled with a tiny number (0.xxx ms)
 
 **Impact:**  
 - Inconsistent minisector times  
 - PB / best values may be corrupted  
 
 **Workaround:**  
-Rollback logic only removes minisectors whose `end_ms` is greater than the current lap time.
+Flashback: Rollback logic only removes minisectors whose `end_ms` is greater than the current lap time.
 
 **Planned fix:**  
 Additional safeguards using a lap UID or distance–time consistency checks.
