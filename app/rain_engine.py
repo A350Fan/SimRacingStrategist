@@ -765,7 +765,7 @@ class RainEngine:
                     # -------- Inter -> Wet --------
                     # Use pace delta (W-I) when available to avoid "too early" full-wet calls.
                     # If Wet is faster by X s/lap, the stop pays back after ~pit_loss/X laps.
-                    if delta_wi_med is not None and float(delta_wi_med) < -0.05:
+                    if delta_wi_med is not None and float(delta_wi_med) < -p.wi_delta_min:
                         wet_gain_per_lap = max(0.0, -float(delta_wi_med))
                         # conservative: require some headroom (buffer laps) unless SC makes it cheap
                         buffer_laps = 0 if under_sc else 1
