@@ -828,9 +828,7 @@ class RainEngine:
                         forecast_dry = False
 
                         if rain_3 is not None and rain_5 is not None:
-
-                            forecast_dry = (rain_3 < 40 and rain_5 < 35)
-
+                            forecast_dry = (rain_3 < p.fc_dry_3 and rain_5 < p.fc_dry_5)
                         elif rain_next_med is not None:
 
                             forecast_dry = (rain_next_med < 35.0)
