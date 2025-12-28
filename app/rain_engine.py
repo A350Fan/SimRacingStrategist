@@ -602,7 +602,7 @@ class RainEngine:
                 cond_reason.append(f"rain_now>={p.cond_rain_now_on:g}")
         # 2) Track temp dropping quickly (often rain onset)
         if track_slope_cpm is not None:
-            if track_slope_cpm <= -0.45:  # °C/min drop
+            if track_slope_cpm <= p.cond_track_drop_cpm:  # °C/min drop
                 cond_shift = True
                 cond_reason.append("trackTemp_drop")
         # 3) Pace delta turning against slicks (inter faster) -> strong shift
