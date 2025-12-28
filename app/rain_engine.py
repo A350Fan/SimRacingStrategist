@@ -860,8 +860,10 @@ class RainEngine:
                         advice = box_in(1, "C4", "Track dry: Inter no longer justified.")
                     else:
                         w_enum = int(weather_med) if weather_med is not None else None
-                        track_warming = (track_slope_cpm is not None and track_slope_cpm >= +0.25)  # °C/min
-                        track_warming_fast = (track_slope_cpm is not None and track_slope_cpm >= +0.40)
+                        track_warming = (
+                                    track_slope_cpm is not None and track_slope_cpm >= p.dry_track_warming_cpm)  # °C/min
+                        track_warming_fast = (
+                                    track_slope_cpm is not None and track_slope_cpm >= p.dry_track_warming_fast_cpm)
 
                         # Forecast dryness confirmation (prefer multi-horizon if present)
                         fc_dry = False
