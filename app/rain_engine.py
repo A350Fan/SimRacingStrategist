@@ -494,7 +494,8 @@ class RainEngine:
         temp_boost = 0.0
         if track_temp_med is not None:
             # below ~22C slightly more slippery in drizzle, cap boost
-            temp_boost = _clamp01((22.0 - track_temp_med) / 18.0) * 0.08  # max +0.08
+            temp_boost = (
+        _clamp01((p.cold_track_ref_c - track_temp_med) / p.cold_track_span_c) * p.cold_track_boost_max)  # max +0.08
 
         # Weighted fusion (ignore missing signals gracefully)
         parts = []
