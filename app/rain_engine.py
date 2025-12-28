@@ -799,9 +799,8 @@ class RainEngine:
                     if delta_wi_med is not None and float(delta_wi_med) > p.wi_delta_min:
                         inter_gain_per_lap = max(0.0, float(delta_wi_med))
                         buffer_laps = 0 if under_sc else 1
-
-                        laps_to_payback = int((pit_loss_s / max(0.10, inter_gain_per_lap)) + 0.999)  # ceil
-
+                        laps_to_payback = int(
+                            (pit_loss_s / max(p.wi_payback_min_gain, inter_gain_per_lap)) + 0.999)  # ceil
                         if laps_remaining >= (laps_to_payback + buffer_laps + 1):
 
                             n = 1 if under_sc or inter_gain_per_lap >= 0.45 else 2
