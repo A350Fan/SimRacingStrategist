@@ -2,6 +2,7 @@
   "app.title": "SimRaceStrategist – Prototype",
 
   "tab.live": "Live",
+  "tab.live_raw": "Live (Raw)",
   "tab.db": "Laps / DB",
   "tab.model": "Model",
   "tab.settings": "Settings",
