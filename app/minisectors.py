@@ -14,6 +14,11 @@ class MiniRow:
     idx: int
     last_ms: Optional[int] = None
 
+    # NEW: Which lap does last_ms belong to?
+    # This allows the UI to keep showing old values across the lap line,
+    # while calculations (Theo/Missing) can ignore stale values.
+    last_lap_tag: Optional[int] = None
+
     # If True, last_ms was not measured directly but derived (fallback).
     # We only use this as a safety net when a lap would otherwise be unusable.
     last_estimated: bool = False
@@ -75,6 +80,36 @@ class MiniSectorTracker:
         # 1-based minisector numbers
         return [r.idx + 1 for r in self._rows if r.last_ms is None]
 
+    def sum_last_ms_current(self) -> Optional[int]:
+        """
+        Sum of minisectors for the CURRENT lap only.
+        We require that each minisector has a value tagged with the current lap number.
+        """
+        if self._last_lap_num is None:
+            return self.sum_last_ms()
+
+        vals = []
+        for r in self._rows:
+            if r.last_ms is None:
+                return None
+            vals.append(int(r.last_ms))
+        return int(sum(vals))
+
+    def missing_current_indices(self) -> list[int]:
+        """
+        Minisectors that are missing for the CURRENT lap (tag mismatch or None).
+        1-based minisector numbers.
+        """
+        if self._last_lap_num is None:
+            return self.missing_last_indices()
+
+        cur = int(self._last_lap_num)
+        out = []
+        for r in self._rows:
+            if r.last_ms is None:
+                out.append(r.idx + 1)
+        return out
+
     def pop_completed_laps(self) -> List[dict]:
         """
         Return and clear completed-lap snapshots.
@@ -114,9 +149,12 @@ class MiniSectorTracker:
         # Clearing Last here prevents stale minisector times from leaking into the next lap
         # when we miss early ticks (which is the root cause for MS1 being "empty" or wrong).
         for r in self._rows:
-            r.last_ms = None
+            # IMPORTANT:
+            # Do NOT wipe r.last_ms here, otherwise the UI will "blank" the whole Last column on lap line.
+            # We only reset per-lap timeline bookkeeping. Each minisector will be overwritten individually
+            # as soon as we measure it in the new lap.
             r.last_end_ms = None
-            r.last_estimated = False
+            # keep last_estimated + last_ms visible (belongs to previous lap via last_lap_tag)
 
         self._cur_idx = None
         self._last_split_ms = 0 if isinstance(cur_lap_time_ms, int) else None
@@ -600,7 +638,14 @@ class MiniSectorTracker:
         else:
             r.last_ms = split_ms
             r.last_end_ms = now_ms
-            r.last_estimated = False  # <- wichtig: echtes Messsignal überschreibt Fallback
+            r.last_estimated = False  # echtes Messsignal überschreibt Fallback
+
+            # Tag this split as belonging to the current lap number (if available)
+            try:
+                r.last_lap_tag = int(cur_lap_num) if cur_lap_num is not None else self._last_lap_num
+            except Exception:
+                r.last_lap_tag = self._last_lap_num
+
             if r.pb_ms is None or split_ms < r.pb_ms:
                 r.pb_ms = split_ms
             if r.best_ms is None or split_ms < r.best_ms:

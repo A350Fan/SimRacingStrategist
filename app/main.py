@@ -1573,7 +1573,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 ss = s - 60 * m
                 return f"{m}:{ss:06.3f}"
 
-            t_last = self.ms.sum_last_ms()
+            t_last = self.ms.sum_last_ms_current()
             t_pb = self.ms.sum_pb_ms()
             t_best = self.ms.sum_best_ms()
 
@@ -1581,7 +1581,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.lblTheoPB.setText(f"Theo PB: {fmt_lap(t_pb)}")
             self.lblTheoBest.setText(f"Theo Best: {fmt_lap(t_best)}")
 
-            missing = self.ms.missing_last_indices()
+            missing = self.ms.missing_current_indices()
             if missing:
                 # show only first few to avoid UI spam
                 preview = ", ".join(f"{x:02d}" for x in missing[:6])
