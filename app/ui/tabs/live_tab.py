@@ -44,7 +44,7 @@ class LiveTabWidget(QtWidgets.QWidget):
 
         stage_grid = QtWidgets.QGridLayout(self.stage)
         stage_grid.setContentsMargins(0, 0, 0, 0)
-        stage_grid.setSpacing(0)
+        stage_grid.setSpacing(18)
         stage_grid.setRowStretch(0, 0)
         stage_grid.setRowStretch(1, 1)
         stage_grid.setColumnStretch(0, 0)
@@ -99,7 +99,7 @@ class LiveTabWidget(QtWidgets.QWidget):
         """)
 
         content_lay = QtWidgets.QVBoxLayout(self.content)
-        content_lay.setContentsMargins(0, 0, 0, 0)
+        content_lay.setContentsMargins(6, 0, 0, 0)
         content_lay.setSpacing(10)
 
         # (A) Live lap stopwatch
