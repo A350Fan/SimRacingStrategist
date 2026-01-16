@@ -1394,6 +1394,16 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 self.lblTheoMiss.setText("")
 
+            # --- NEW: update Live (GUI) ASCII HUD minisector bars with the SAME source data ---
+            try:
+                if hasattr(self, "live_tab") and self.live_tab is not None:
+                    hud = getattr(self.live_tab, "hud", None)
+                    if hud is not None and hasattr(hud, "update_minisectors_from_tracker"):
+                        hud.update_minisectors_from_tracker(rows, cur_mi)
+            except Exception:
+                pass
+
+
 
         except Exception as e:
             print("[MINISECTOR UI ERROR]", type(e).__name__, e)

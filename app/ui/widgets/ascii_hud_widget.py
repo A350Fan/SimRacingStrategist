@@ -42,12 +42,19 @@ class SegmentBar(QtWidgets.QWidget):
         super().__init__(parent)
         self._segments = int(segments)
         self._filled = 0
+
+        # If None -> use palette highlight (default).
+        # If set -> use exact color (to match Live Raw minisector colors).
+        self._fill_color: QtGui.QColor | None = None
+
         self.setMinimumHeight(14)
         self.setMaximumHeight(16)
 
-    def set_progress(self, filled: int):
+    def set_progress(self, filled: int, fill_color: QtGui.QColor | None = None):
         self._filled = max(0, min(int(filled), self._segments))
+        self._fill_color = fill_color
         self.update()
+
 
     def paintEvent(self, e: QtGui.QPaintEvent) -> None:
         p = QtGui.QPainter(self)
@@ -64,7 +71,7 @@ class SegmentBar(QtWidgets.QWidget):
 
         # Use palette so it adapts to your theme
         base = self.palette().color(QtGui.QPalette.ColorRole.Dark)
-        fill = self.palette().color(QtGui.QPalette.ColorRole.Highlight)
+        fill = self._fill_color or self.palette().color(QtGui.QPalette.ColorRole.Highlight)
 
         p.setPen(QtCore.Qt.PenStyle.NoPen)
         for i in range(seg):
@@ -104,10 +111,11 @@ class MiniSectorBars(QtWidgets.QWidget):
 
         grid.setColumnStretch(1, 1)
 
-    def set_row(self, idx: int, filled: int, delta_s: float | None):
+    def set_row(self, idx: int, filled: int, delta_s: float | None, color: QtGui.QColor | None = None):
         if idx < 0 or idx > 2:
             return
-        self._bars[idx].set_progress(filled)
+        self._bars[idx].set_progress(filled, fill_color=color)
+
         if delta_s is None:
             self._deltas[idx].setText("—")
         else:
@@ -323,15 +331,9 @@ class AsciiHudWidget(QtWidgets.QFrame):
         self.lapTimer.set_info_line(f"Q | {weather if weather is not None else '—'} | {tyre if tyre is not None else '—'} | C{sess if sess is not None else '—'}")
 
         # --- Minisectors ---
-        # Right now we don't have your real minisector live values wired in this file.
-        # So we show placeholders that are easy to spot while you hook real numbers.
-        # You can replace these three lines with real minisector progress + delta values.
-        try:
-            self.miniBars.set_row(0, 7, +0.032)
-            self.miniBars.set_row(1, 10, -0.141)
-            self.miniBars.set_row(2, 10, -0.129)
-        except Exception:
-            pass
+        # Updated via MainWindow._update_minisector_table() -> hud.update_minisectors_from_tracker(...)
+        # (We intentionally don't guess here, so Live Raw stays source of truth.)
+        pass
 
         # --- Live delta (prefer state value, fallback to LapTimerWidget delta) ---
         delta_s = (
@@ -374,3 +376,75 @@ class AsciiHudWidget(QtWidgets.QFrame):
         self.lblGear.setText(f"Gear {_int(gear)}")
         self.lblThrottle.setText(f"T {_pct(thr)}")
         self.lblBrake.setText(f"B {_pct(brk)}")
+
+    def update_minisectors_from_tracker(self, rows: list[object], cur_mi: int | None) -> None:
+        """
+        Called by MainWindow after it updated Live Raw minisector table.
+        Uses the SAME color logic as MainWindow._update_minisector_table().
+
+        rows: self.ms.rows()  (len 30)
+        cur_mi: self.ms.current_index() (0..29) or None
+        """
+        # Colors copied from your Live Raw logic
+        PURPLE = QtGui.QColor(160, 32, 240)
+        GREEN = QtGui.QColor(0, 255, 0)
+        YELLOW = QtGui.QColor(255, 239, 0)
+        NEUTRAL = QtGui.QColor(45, 45, 45)
+
+        def base_color(r) -> QtGui.QColor:
+            # EXACT behavior: purple if last==best, green if last==pb else yellow, neutral if none
+            if getattr(r, "last_ms", None) is None:
+                return NEUTRAL
+            last_ms = r.last_ms
+            best_ms = getattr(r, "best_ms", None)
+            pb_ms = getattr(r, "pb_ms", None)
+
+            if best_ms is not None and last_ms == best_ms:
+                return PURPLE
+            if pb_ms is not None and last_ms == pb_ms:
+                return GREEN
+            return YELLOW
+
+        def delta_s_of(r) -> float | None:
+            last_ms = getattr(r, "last_ms", None)
+            pb_ms = getattr(r, "pb_ms", None)
+            if last_ms is None or pb_ms is None:
+                return None
+            return (last_ms - pb_ms) / 1000.0
+
+        if not rows or len(rows) < 30:
+            # nothing to do
+            self.miniBars.set_row(0, 0, None, NEUTRAL)
+            self.miniBars.set_row(1, 0, None, NEUTRAL)
+            self.miniBars.set_row(2, 0, None, NEUTRAL)
+            return
+
+        for sector_idx in range(3):
+            start = sector_idx * 10
+            end = start + 9
+
+            # filled segments = progress of current minisector index
+            filled = 0
+            if cur_mi is not None:
+                if cur_mi < start:
+                    filled = 0
+                elif cur_mi > end:
+                    filled = 10
+                else:
+                    filled = (cur_mi - start) + 1  # 1..10
+
+            # color/delta based on LAST completed minisector in that sector (up to cur_mi)
+            last_done = None
+            for mi in range(start, end + 1):
+                r = rows[mi]
+                if getattr(r, "last_ms", None) is None:
+                    continue
+                if cur_mi is not None and mi > cur_mi:
+                    continue
+                last_done = mi
+
+            if last_done is None:
+                self.miniBars.set_row(sector_idx, filled, None, NEUTRAL)
+            else:
+                r = rows[last_done]
+                self.miniBars.set_row(sector_idx, filled, delta_s_of(r), base_color(r))
