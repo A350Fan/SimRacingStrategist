@@ -1,6 +1,8 @@
 # app/ui/widgets/ascii_hud_widget.py
 from __future__ import annotations
 
+import time
+
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from app.ui.widgets.lap_timer_widget import LapTimerWidget
@@ -258,7 +260,20 @@ class AsciiHudWidget(QtWidgets.QFrame):
         topLay.setContentsMargins(10, 10, 10, 10)
         topLay.setSpacing(6)
 
-        self.lapTimer = LapTimerWidget(self.boxTop)  # already running stopwatch logic :contentReference[oaicite:1]{index=1}
+        # After a lap is completed we want to keep the *end-of-lap* minisector bars on screen
+        # for a short duration (standstill), so you can verify the minisector outcome.
+        # LapTimerWidget already freezes its own stopwatch UI.
+        self._mini_freeze_seconds = 5.0
+        self._mini_freeze_until_t = 0.0
+
+        self.lapTimer = LapTimerWidget(self.boxTop)
+
+        # When LapTimerWidget detects S/F, freeze minisectors for a short moment as well.
+        try:
+            self.lapTimer.lapCompleted.connect(self._on_lap_completed)
+        except Exception:
+            pass
+
         topLay.addWidget(self.lapTimer)
 
         outer.addWidget(self.boxTop)
@@ -387,6 +402,19 @@ class AsciiHudWidget(QtWidgets.QFrame):
         self.lblThrottle.setText(f"T {_pct(thr)}")
         self.lblBrake.setText(f"B {_pct(brk)}")
 
+    def set_mini_freeze_seconds(self, seconds: float) -> None:
+        """Configure how long minisectors should stay frozen after a lap is completed."""
+        try:
+            self._mini_freeze_seconds = max(0.0, float(seconds))
+        except Exception:
+            self._mini_freeze_seconds = 0.0
+
+    def _on_lap_completed(self, lap_ms: int) -> None:
+        """Slot: triggered by LapTimerWidget when it detects a lap completion."""
+        if self._mini_freeze_seconds <= 0:
+            return
+        self._mini_freeze_until_t = time.monotonic() + self._mini_freeze_seconds
+
     def update_minisectors_from_tracker(self, rows: list[object], cur_mi: int | None) -> None:
         """
         Called by MainWindow after it updated Live Raw minisector table.
@@ -395,6 +423,10 @@ class AsciiHudWidget(QtWidgets.QFrame):
         rows: self.ms.rows()  (len 30)
         cur_mi: self.ms.current_index() (0..29) or None
         """
+
+        if self._mini_freeze_until_t and time.monotonic() < self._mini_freeze_until_t:
+            return
+
         # Colors copied from your Live Raw logic
         PURPLE = QtGui.QColor(160, 32, 240)
         GREEN = QtGui.QColor(0, 255, 0)

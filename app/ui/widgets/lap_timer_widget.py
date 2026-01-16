@@ -28,7 +28,17 @@ class LapTimerWidget(QtWidgets.QWidget):
       - When we detect crossing S/F -> we "complete" the current lap, compute lap time from monotonic clock,
         update PB, reset stopwatch for the next lap.
       - While on lap -> a QTimer refreshes the display (smooth stopwatch).
+
+    Cooldown / Standbild:
+      - Nach S/F halten wir die *fertige* Rundenzeit kurz als Standbild,
+        damit man sie lesen kann. Intern starten wir die nächste Runde trotzdem sofort,
+        damit die Messung korrekt bleibt.
     """
+
+    # Emitted when we detect a Start/Finish crossing and accept a lap time.
+    # Argument: completed lap time in ms.
+    lapCompleted = QtCore.Signal(int)
+
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -40,6 +50,18 @@ class LapTimerWidget(QtWidgets.QWidget):
         self._lap_start_t = 0.0            # time.monotonic() at lap start
         self._last_lap_complete_ms = None  # last completed lap time (our measurement)
         self._pb_ms = None                 # best lap time (our measurement)
+
+        # -----------------------
+        # "cooldown" display hold
+        # -----------------------
+        # After crossing S/F we want to briefly hold the finished lap time on screen,
+        # so you can read/check it. Internally, we still start the next lap immediately
+        # (so timing stays accurate), but the UI stays frozen for a short duration.
+        self._freeze_seconds = 5.0
+        self._freeze_until_t = 0.0
+        self._frozen_ms: int | None = None
+        self._frozen_delta_text: str | None = None
+        self._frozen_lap_label: str | None = None
 
         # crossing detection helpers
         self._last_lap_num = None
@@ -112,9 +134,20 @@ class LapTimerWidget(QtWidgets.QWidget):
         self._last_lap_num = None
         self._last_dist_m = None
         self._track_len_m = None
+        self._freeze_until_t = 0.0
+        self._frozen_ms = None
+        self._frozen_delta_text = None
+        self._frozen_lap_label = None
         self.lblLap.setText("Lap —")
         self.lblTime.setText("—")
         self.lblDelta.setText("Δ vs PB: —")
+
+    def set_freeze_seconds(self, seconds: float) -> None:
+        """Configure how long the widget should hold the finished lap time after S/F."""
+        try:
+            self._freeze_seconds = max(0.0, float(seconds))
+        except Exception:
+            self._freeze_seconds = 0.0
 
     # -----------------------
     # Public getters (used by HUD)
@@ -169,7 +202,10 @@ class LapTimerWidget(QtWidgets.QWidget):
         # Detect crossing Start/Finish:
         crossed = self._detect_sf_crossing(lap_num=lap_num, dist_m=dist_m)
         if crossed:
-            self._complete_lap_and_restart()
+            # If lap number increments, _last_lap_num is the lap we just finished.
+            # Otherwise best-effort use current lap_num.
+            completed_lap_num = self._last_lap_num if self._last_lap_num is not None else self._safe_int(lap_num)
+            self._complete_lap_and_restart(completed_lap_num=completed_lap_num)
 
         # Remember last values for next detection step
         self._last_lap_num = self._safe_int(lap_num) if lap_num is not None else self._last_lap_num
@@ -199,7 +235,7 @@ class LapTimerWidget(QtWidgets.QWidget):
             return None
         return int(round((time.monotonic() - self._lap_start_t) * 1000.0))
 
-    def _complete_lap_and_restart(self) -> None:
+    def _complete_lap_and_restart(self, completed_lap_num: int | None = None) -> None:
         now = time.monotonic()
         # debounce so we don't trigger twice if distance jitters around 0
         if (now - self._last_cross_t) < self._cross_debounce_s:
@@ -220,11 +256,45 @@ class LapTimerWidget(QtWidgets.QWidget):
         if self._pb_ms is None or lap_ms < self._pb_ms:
             self._pb_ms = lap_ms
 
-        # Restart stopwatch for next lap
+        # -----------------------
+        # Freeze UI for a moment
+        # -----------------------
+        if self._freeze_seconds > 0:
+            self._freeze_until_t = now + self._freeze_seconds
+            self._frozen_ms = lap_ms
+
+            # Lap label: show the lap we just completed (nice for review)
+            if completed_lap_num is not None:
+                self._frozen_lap_label = f"Lap {int(completed_lap_num)}"
+            else:
+                self._frozen_lap_label = self.lblLap.text()
+
+            # Delta label at the finish line: finished lap vs PB
+            if self._pb_ms is None:
+                self._frozen_delta_text = "Δ vs PB: —"
+            else:
+                d_ms = lap_ms - self._pb_ms
+                sign = "+" if d_ms >= 0 else "-"
+                self._frozen_delta_text = f"Δ vs PB: {sign}{abs(d_ms) / 1000.0:.3f}"
+
+            # Apply frozen texts immediately (so the snap is visible)
+            if self._frozen_lap_label:
+                self.lblLap.setText(self._frozen_lap_label)
+            self.lblTime.setText(_fmt_ms(self._frozen_ms))
+            if self._frozen_delta_text:
+                self.lblDelta.setText(self._frozen_delta_text)
+
+        # Restart stopwatch for next lap (internal timing stays correct)
         self._start_new_lap()
 
         # Update delta label immediately (nice “snap” on the line)
         self._update_delta_label(current_ms=0)
+
+        # Notify others (e.g. minisectors HUD) that a lap was completed.
+        try:
+            self.lapCompleted.emit(int(lap_ms))
+        except Exception:
+            pass
 
     def _detect_sf_crossing(self, lap_num, dist_m) -> bool:
         """
@@ -260,11 +330,15 @@ class LapTimerWidget(QtWidgets.QWidget):
         return False
 
     def _on_tick(self) -> None:
-        """
-        UI refresh loop:
-        - Shows the running stopwatch time
-        - Shows delta vs PB based on current elapsed (during the lap)
-        """
+        # If we are in "cooldown", keep showing the finished lap as a standstill.
+        if self._freeze_until_t and time.monotonic() < self._freeze_until_t:
+            if self._frozen_lap_label:
+                self.lblLap.setText(self._frozen_lap_label)
+            self.lblTime.setText(_fmt_ms(self._frozen_ms))
+            if self._frozen_delta_text:
+                self.lblDelta.setText(self._frozen_delta_text)
+            return
+
         ms = self._elapsed_ms()
         self.lblTime.setText(_fmt_ms(ms))
 
