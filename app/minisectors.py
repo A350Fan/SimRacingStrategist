@@ -439,19 +439,21 @@ class MiniSectorTracker:
             # LapNum is not reliable/early enough in some situations. Use cur_lap_time_ms instead:
             # If curLap time is still small, we assume we are at the start of a (new) lap even if the first
             # UDP tick arrives already deep into the lap (e.g. 600m / 7.5s).
+
+            # Treat as lap start in two situations:
+            # 1) We JUST detected a lap change (most reliable signal we have).
+            #    In that case, even if the first tick arrives at ld0 ~ 0..5m, we MUST start timing at 0ms,
+            #    otherwise MS01 becomes a "partial split" and will be discarded forever.
+            # 2) We attach early in a lap (now_ms small) even if lapNum is unreliable.
+
+            force_lap_start = bool(self._just_lapped and (now_ms <= 120_000))
+
             treat_as_lap_start = (
-                    (ld0 is not None)
-                    and (ld0 > 5.0)
-                    and (
-                            (
-                                    (now_ms <= 15000)
-                                    and (ld0 < 0.35 * tl)
-                            )
-                            or (
-                                    self._just_lapped
-                                    and (now_ms <= 120_000)
-                                    and (ld0 < 0.60 * tl)
-                            )
+                    force_lap_start
+                    or (
+                            (ld0 is not None)
+                            and (now_ms <= 15000)
+                            and (ld0 < 0.35 * tl)
                     )
             )
 
@@ -464,6 +466,11 @@ class MiniSectorTracker:
                 f"last_lap_num={self._last_lap_num} "
                 f"cur_lap_num={cur_lap_num}"
             )
+
+            # We consumed the "just lapped" hint now (regardless of which branch we take).
+            # Prevent it from leaking into later ticks.
+            if self._just_lapped:
+                self._just_lapped = False
 
             if treat_as_lap_start:
                 # Backfill minisectors 0..idx-1 proportionally by distance, then start timing from start of idx.
