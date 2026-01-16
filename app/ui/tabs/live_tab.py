@@ -6,6 +6,7 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from app.ui.widgets.flag_widget import FlagWidget
 from app.ui.widgets.lap_timer_widget import LapTimerWidget
 from app.ui.widgets.minisector_widget import MiniSectorWidget
+from app.ui.widgets.ascii_hud_widget import AsciiHudWidget
 
 
 class LiveTabWidget(QtWidgets.QWidget):
@@ -102,13 +103,9 @@ class LiveTabWidget(QtWidgets.QWidget):
         content_lay.setContentsMargins(6, 0, 0, 0)
         content_lay.setSpacing(10)
 
-        # (A) Live lap stopwatch
-        self.lapTimer = LapTimerWidget(self.content)
-        content_lay.addWidget(self.lapTimer, 0)
-
-        # (B) Minisectors widget (existing table-based widget for now)
-        self.miniSectorWidget = MiniSectorWidget(self.content)
-        content_lay.addWidget(self.miniSectorWidget, 1)
+        # ASCII-like HUD (compact, boxed, monospace)
+        self.hud = AsciiHudWidget(self.content)
+        content_lay.addWidget(self.hud, 1)
 
         # Place content to the right of the flag container (row 0, col 1)
         # Align top so it matches your ASCII mockup style.
@@ -158,9 +155,9 @@ class LiveTabWidget(QtWidgets.QWidget):
         except Exception:
             pass
 
-        # Feed lap timer (stopwatch / S-F detection)
+        # Feed ASCII HUD (includes lap timer, minisectors, delta bar, footer)
         try:
-            self.lapTimer.feed_state(state)
+            self.hud.feed_state(state)
         except Exception:
             pass
 
