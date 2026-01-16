@@ -2,6 +2,8 @@ from __future__ import annotations
 from PySide6 import QtWidgets
 
 from app.strategy import generate_placeholder_cards
+from app.ui.widgets.minisector_widget import MiniSectorWidget
+
 
 
 class LiveRawTabWidget(QtWidgets.QWidget):
@@ -94,45 +96,17 @@ class LiveRawTabWidget(QtWidgets.QWidget):
             stratLayout.addWidget(w)
             self.cardWidgets.append(w)
 
-        # --- Minisectors group ---
-        self.grpMini = QtWidgets.QGroupBox("Minisectors (10 per sector)")
-        live_outer.addWidget(self.grpMini, 1)
+        # --- Minisectors widget (extracted) ---
+        self.miniSectorWidget = MiniSectorWidget(parent=self)
+        live_outer.addWidget(self.miniSectorWidget, 1)
 
-        ml = QtWidgets.QVBoxLayout(self.grpMini)
-        ml.setContentsMargins(6, 6, 6, 6)
-        ml.setSpacing(6)
-
-        self.tblMini = QtWidgets.QTableWidget()
-        self.tblMini.verticalHeader().setVisible(False)
-        self.tblMini.setColumnCount(5)
-        self.tblMini.setHorizontalHeaderLabels(["Minisector", "Last", "PB", "Best", "ΔPB"])
-        self.tblMini.setRowCount(33)
-        self.tblMini.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-
-        self.grpMini.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-        self.tblMini.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-
-        ml.addWidget(self.tblMini)
-
-        # Theo lap time summary row
-        theoRow = QtWidgets.QHBoxLayout()
-        self.lblTheoLast = QtWidgets.QLabel("Theo Last: —")
-        self.lblTheoPB = QtWidgets.QLabel("Theo PB: —")
-        self.lblTheoBest = QtWidgets.QLabel("Theo Best: —")
-        self.lblTheoMiss = QtWidgets.QLabel("")
-
-        for w in (self.lblTheoLast, self.lblTheoPB, self.lblTheoBest):
-            w.setStyleSheet("font-weight: 700;")
-
-        theoRow.addWidget(self.lblTheoLast)
-        theoRow.addSpacing(12)
-        theoRow.addWidget(self.lblTheoPB)
-        theoRow.addSpacing(12)
-        theoRow.addWidget(self.lblTheoBest)
-        theoRow.addStretch(1)
-        theoRow.addWidget(self.lblTheoMiss)
-
-        ml.addLayout(theoRow)
+        # IMPORTANT: Keep legacy attribute names so MainWindow logic remains unchanged
+        self.grpMini = self.miniSectorWidget  # groupbox itself
+        self.tblMini = self.miniSectorWidget.tblMini
+        self.lblTheoLast = self.miniSectorWidget.lblTheoLast
+        self.lblTheoPB = self.miniSectorWidget.lblTheoPB
+        self.lblTheoBest = self.miniSectorWidget.lblTheoBest
+        self.lblTheoMiss = self.miniSectorWidget.lblTheoMiss
 
     def retranslate(self):
         """Called by MainWindow when language changes."""
