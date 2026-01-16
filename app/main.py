@@ -548,11 +548,21 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
+        # Update LIVE (Raw) labels (existing behavior)
         QtCore.QMetaObject.invokeMethod(
             self,
             "_update_live_labels",
             QtCore.Qt.QueuedConnection,
         )
+
+        # NEW (additive): also feed the new Live (GUI) tab in parallel
+        # IMPORTANT: do NOT call QWidget methods directly from UDP thread!
+        # Use a Qt Signal -> queued to UI thread.
+        try:
+            if hasattr(self, "live_tab") and self.live_tab is not None:
+                self.live_tab.stateReceived.emit(state)
+        except Exception:
+            pass
 
     def _maybe_record_udp_lap(self, state: F1LiveState) -> None:
         """
