@@ -27,7 +27,7 @@ Legend:
   - DB export (CSV) for debugging
 
 ### Minisectors (F1 25)
-- 🚧 Stabilize lap start detection (MS01 edge cases)
+- ✅ Stabilize lap start detection (MS01 edge cases)
 - ⏳ Add a minisector debug dump (per lap snapshot) to log
 - ⏳ Add a per-track minisector sanity checker:
   - missing indices

@@ -15,7 +15,7 @@ Semantic Versioning (in an early 0.x stage).
 - None
 
 ### Fixed
-- None
+- MS01 not being recognized
 
 ---
 ## [0.2.0] - 2025-12-27

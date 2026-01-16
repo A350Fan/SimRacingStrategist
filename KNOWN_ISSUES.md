@@ -6,27 +6,7 @@ This document lists known problems, limitations, and workarounds of the project.
 
 ## 🟥 Critical Issues
 
-### KI-001 – Minisector detection at lap start may be unreliable
-**Affected version(s):** v0.1.0 - v0.2.0   
-**Affected modules:** MiniSectorTracker, f1_udp  
-
-**Description:**  
-The first minisector (MS01) may be skipped at the start of a lap if the first UDP tick arrives late or if the lap distance (`LapDist`) is already significantly greater than zero.
-
-**Impact:**  
-- Incomplete minisector data for the lap  
-- Delta / PB calculations not possible  
-
-**Workaround:**  
-- Enable robustness logic (`treat_as_lap_start`)  
-- Backfilling using distance proportion  
-
-**Planned fix:**  
-Further validation with different FPS / UDP tick rates, possibly introducing a time-based lap start anchor.
-
----
-
-### KI-002 – Minisector tracking unstable
+### KI-001 – Minisector tracking unstable
 **Affected version(s):** v0.1.0 - v0.2.0   
 **Affected modules:** MiniSectorTracker  
 
@@ -43,6 +23,25 @@ Flashback: Rollback logic only removes minisectors whose `end_ms` is greater tha
 
 **Planned fix:**  
 Additional safeguards using a lap UID or distance–time consistency checks.
+
+### KI-002 – Last MS wrong deletion
+**Affected version(s):** v0.1.0 - v0.2.0   
+**Affected modules:** MiniSectorTracker  
+
+**Description:**  
+When running over start/finish, every Last MS time is being deleted which results in 
+a malfunctioning theo Last calculation
+
+**Impact:**  
+- no last theo times 
+- last MS times being deleted at the wrong time  
+
+**Workaround:**
+- none
+
+**Planned fix:**  
+- making MS saving independent of starting new lap for MS1 detection
+
 
 ---
 
