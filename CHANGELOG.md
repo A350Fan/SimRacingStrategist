@@ -9,7 +9,13 @@ Semantic Versioning (in an early 0.x stage).
 ## [Unreleased]
 
 ### Added
-- None
+- begin of building intuitive UI
+  - added flag widget
+  - added lap timing data widget
+    - lap timing
+    - minisectors
+    - delta (WIP)
+    - other informations (e.g. weather, tyre, speed); WIP
 
 ### Changed
 - outsourcing of elements for smaller files

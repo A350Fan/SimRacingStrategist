@@ -94,6 +94,17 @@ Legend:
   - e.g. "Stint 2 – Lap 5"
 - 🚧 Show minisector times with color coding
   - green / yellow / purple (🚧 green not there because no opponent times)
+- 🚧 more intuitive UI for easier use
+  - flags being displayed as icon
+  - session timing data
+    - lap time
+    - minisectors
+    - delta
+    - other
+      - speed
+      - tyres
+      - weather
+      - etc.
 
 ### Driver & Data Selection
 - ⏳ Allow selecting individual drivers

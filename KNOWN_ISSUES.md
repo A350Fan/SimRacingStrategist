@@ -131,9 +131,26 @@ Connect to real strategy outputs.
 
 ---
 
+### KI-007 – lap timing is not done yet
+**Affected version(s):** v0.1.0 - v0.2.1   
+**Affected modules:** UI  
+
+**Description:**  
+- some data could be strange (delta is wrong)
+- tyre sets are shown wrongly
+- speed etc. have no data
+
+**Impact:**  
+- some features are just not done yet --> can't use them  
+
+**Planned fix:**  
+- finish UI implementation
+
+---
+
 ## 🧪 Experimental / Design-related Limitations
 
-### KI-007 – Field deltas not always available
+### KI-008 – Field deltas not always available
 **Affected version(s):** v0.1.0 - v0.2.0   
 **Affected modules:** RainEngine  
 
@@ -149,7 +166,7 @@ By design – sufficient sample size is required.
 
 ---
 
-### KI-008 – Tyre wear learning requires sufficient data
+### KI-009 – Tyre wear learning requires sufficient data
 **Affected version(s):** v0.1.0 - v0.2.0  
 **Affected modules:** Degradation Model  
 
