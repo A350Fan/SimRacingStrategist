@@ -43,18 +43,20 @@ class SegmentBar(QtWidgets.QWidget):
         self._segments = int(segments)
         self._filled = 0
 
-        # If None -> use palette highlight (default).
-        # If set -> use exact color (to match Live Raw minisector colors).
-        self._fill_color: QtGui.QColor | None = None
+        # Optional per-segment colors (len == segments). If None -> palette highlight.
+        self._segment_colors: list[QtGui.QColor] | None = None
 
         self.setMinimumHeight(14)
         self.setMaximumHeight(16)
 
-    def set_progress(self, filled: int, fill_color: QtGui.QColor | None = None):
+    def set_progress(self, filled: int, segment_colors: list[QtGui.QColor] | None = None):
+        """
+        filled: how many segments are "active" (0..segments)
+        segment_colors: per segment fill colors for active segments (len==segments preferred)
+        """
         self._filled = max(0, min(int(filled), self._segments))
-        self._fill_color = fill_color
+        self._segment_colors = segment_colors
         self.update()
-
 
     def paintEvent(self, e: QtGui.QPaintEvent) -> None:
         p = QtGui.QPainter(self)
@@ -69,15 +71,23 @@ class SegmentBar(QtWidgets.QWidget):
         w = (r.width() - gap * (seg - 1)) / seg
         h = r.height()
 
-        # Use palette so it adapts to your theme
         base = self.palette().color(QtGui.QPalette.ColorRole.Dark)
-        fill = self._fill_color or self.palette().color(QtGui.QPalette.ColorRole.Highlight)
+        fallback = self.palette().color(QtGui.QPalette.ColorRole.Highlight)
 
         p.setPen(QtCore.Qt.PenStyle.NoPen)
         for i in range(seg):
             x = r.x() + int(i * (w + gap))
             rect = QtCore.QRectF(x, r.y(), w, h)
-            p.setBrush(fill if i < self._filled else base)
+
+            if i >= self._filled:
+                color = base
+            else:
+                if self._segment_colors is not None and i < len(self._segment_colors):
+                    color = self._segment_colors[i]
+                else:
+                    color = fallback
+
+            p.setBrush(color)
             p.drawRoundedRect(rect, 2.5, 2.5)
 
 
@@ -111,10 +121,10 @@ class MiniSectorBars(QtWidgets.QWidget):
 
         grid.setColumnStretch(1, 1)
 
-    def set_row(self, idx: int, filled: int, delta_s: float | None, color: QtGui.QColor | None = None):
+    def set_row(self, idx: int, filled: int, delta_s: float | None, segment_colors: list[QtGui.QColor] | None = None):
         if idx < 0 or idx > 2:
             return
-        self._bars[idx].set_progress(filled, fill_color=color)
+        self._bars[idx].set_progress(filled, segment_colors=segment_colors)
 
         if delta_s is None:
             self._deltas[idx].setText("—")
@@ -443,8 +453,40 @@ class AsciiHudWidget(QtWidgets.QFrame):
                     continue
                 last_done = mi
 
+            # Per-minisector colors (10 segments)
+            seg_colors: list[QtGui.QColor] = []
+
+            for mi in range(start, end + 1):
+                r = rows[mi]
+
+                # If minisector not completed yet -> keep neutral (it'll still be "inactive" if mi>=filled)
+                if getattr(r, "last_ms", None) is None:
+                    seg_colors.append(NEUTRAL)
+                    continue
+
+                # --- Your requested rule per minisector ---
+                # yellow if LAST slower than PB
+                # else green/purple depending on whether PB is also absolute best
+                last_ms = r.last_ms
+                pb_ms = getattr(r, "pb_ms", None)
+                best_ms = getattr(r, "best_ms", None)
+
+                if pb_ms is None:
+                    seg_colors.append(NEUTRAL)
+                else:
+                    if last_ms > pb_ms:
+                        seg_colors.append(YELLOW)
+                    else:
+                        # last_ms <= pb_ms  (equal or faster)
+                        if best_ms is not None and pb_ms == best_ms:
+                            seg_colors.append(PURPLE)
+                        else:
+                            seg_colors.append(GREEN)
+
+            # Delta label stays: use the last completed minisector in the sector
             if last_done is None:
-                self.miniBars.set_row(sector_idx, filled, None, NEUTRAL)
+                self.miniBars.set_row(sector_idx, filled, None, segment_colors=seg_colors)
             else:
                 r = rows[last_done]
-                self.miniBars.set_row(sector_idx, filled, delta_s_of(r), base_color(r))
+                self.miniBars.set_row(sector_idx, filled, delta_s_of(r), segment_colors=seg_colors)
+
