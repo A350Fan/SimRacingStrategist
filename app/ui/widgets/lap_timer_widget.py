@@ -116,6 +116,28 @@ class LapTimerWidget(QtWidgets.QWidget):
         self.lblTime.setText("—")
         self.lblDelta.setText("Δ vs PB: —")
 
+    # -----------------------
+    # Public getters (used by HUD)
+    # -----------------------
+    def get_elapsed_ms(self) -> int | None:
+        """Current running lap elapsed time in ms (stopwatch)."""
+        return self._elapsed_ms()
+
+    def get_pb_ms(self) -> int | None:
+        """Current best lap (PB) in ms, based on our own measured laps."""
+        return self._pb_ms
+
+    def get_delta_to_pb_s(self) -> float | None:
+        """
+        Current delta to PB in seconds:
+          elapsed - PB
+        Positive = slower than PB (worse), Negative = faster than PB (better).
+        """
+        ms = self._elapsed_ms()
+        if ms is None or self._pb_ms is None:
+            return None
+        return (ms - self._pb_ms) / 1000.0
+
     def feed_state(self, state: object) -> None:
         """
         Called from UI thread (queued signal).

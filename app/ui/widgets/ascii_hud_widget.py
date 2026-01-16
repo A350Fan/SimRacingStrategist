@@ -162,19 +162,32 @@ class LiveDeltaBar(QtWidgets.QWidget):
             return
 
         d = float(self._delta_s)
+
+        # Clamp to scale
         d = max(-self._max_abs, min(self._max_abs, d))
         frac = abs(d) / self._max_abs
 
         half_w = r.width() / 2.0
         fill_w = half_w * frac
 
-        p.setPen(QtCore.Qt.PenStyle.NoPen)
-        p.setBrush(fill)
+        # Colors as requested:
+        # left = slower (delta > 0) -> red
+        # right = faster (delta < 0) -> green
+        red = QtGui.QColor(220, 70, 70)
+        green = QtGui.QColor(70, 200, 120)
 
-        if d < 0:  # faster -> left
+        p.setPen(QtCore.Qt.PenStyle.NoPen)
+
+        if d > 0:
+            # slower -> LEFT (red)
+            p.setBrush(red)
             fr = QtCore.QRectF(mid_x - fill_w, r.y(), fill_w, r.height())
-        else:      # slower -> right
+        elif d < 0:
+            # faster -> RIGHT (green)
+            p.setBrush(green)
             fr = QtCore.QRectF(mid_x, r.y(), fill_w, r.height())
+        else:
+            return  # exactly zero -> no fill
 
         p.drawRoundedRect(fr, 3, 3)
 
@@ -320,21 +333,32 @@ class AsciiHudWidget(QtWidgets.QFrame):
         except Exception:
             pass
 
-        # --- Live delta ---
-        # Best-effort: if your state already has something like live_delta_to_pb_s, use it.
+        # --- Live delta (prefer state value, fallback to LapTimerWidget delta) ---
         delta_s = (
-            getattr(state, "live_delta_to_pb_s", None)
-            or getattr(state, "delta_to_pb_s", None)
-            or getattr(state, "delta_s", None)
+                getattr(state, "live_delta_to_pb_s", None)
+                or getattr(state, "delta_to_pb_s", None)
+                or getattr(state, "delta_s", None)
         )
+
+        # Fallback: LapTimerWidget already knows PB + elapsed, so we can always draw the bar
+        if delta_s is None:
+            try:
+                delta_s = self.lapTimer.get_delta_to_pb_s()
+            except Exception:
+                delta_s = None
+
         try:
             if delta_s is None:
                 self.lblLiveDelta.setText("— s")
                 self.deltaBar.set_delta(None)
             else:
                 ds = float(delta_s)
+
+                # text
                 sign = "+" if ds >= 0 else "-"
                 self.lblLiveDelta.setText(f"{sign}{abs(ds):.3f} s")
+
+                # bar (your rule is handled in LiveDeltaBar.paintEvent: left=slower/red, right=faster/green)
                 self.deltaBar.set_delta(ds, max_abs=1.0)
         except Exception:
             self.lblLiveDelta.setText("— s")
