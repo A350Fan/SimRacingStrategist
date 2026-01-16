@@ -24,30 +24,11 @@ Flashback: Rollback logic only removes minisectors whose `end_ms` is greater tha
 **Planned fix:**  
 Additional safeguards using a lap UID or distance–time consistency checks.
 
-### KI-002 – Last MS wrong deletion
-**Affected version(s):** v0.1.0 - v0.2.0   
-**Affected modules:** MiniSectorTracker  
-
-**Description:**  
-When running over start/finish, every Last MS time is being deleted which results in 
-a malfunctioning theo Last calculation
-
-**Impact:**  
-- no last theo times 
-- last MS times being deleted at the wrong time  
-
-**Workaround:**
-- none
-
-**Planned fix:**  
-- making MS saving independent of starting new lap for MS1 detection
-
-
 ---
 
 ## 🟧 Medium Issues
 
-### KI-003 – Minisector timing may deviate by up to ±16.67 ms
+### KI-002 – Minisector timing may deviate by up to ±16.67 ms
 **Affected version(s):** v0.1.0 - v0.2.0   
 **Affected modules:** MiniSectorTracker  
 
@@ -62,7 +43,7 @@ As a result, minisector times and theoretical lap times may partially deviate fr
 **Planned fix:**  
 A solution for more accurate minisector timing is still under investigation.
 
-### KI-004 – Minisector fallback in F1 2020 is only approximate
+### KI-003 – Minisector fallback in F1 2020 is only approximate
 **Affected version(s):** v0.1.0 - v0.2.0   
 **Affected modules:** MiniSectorTracker  
 
@@ -84,7 +65,7 @@ Optional manual track profiles with real sector distances.
 
 ---
 
-### KI-005 – F1 2020: Minisector times are cleared on every new lap
+### KI-004 – F1 2020: Minisector times are cleared on every new lap
 **Affected version(s):** v0.1.0 - v0.2.0   
 **Affected modules:** MiniSectorTracker, F1 2020 fallback logic  
 
@@ -109,7 +90,7 @@ The current logic treats each lap as an isolated unit.
 
 ---
 
-### KI-006 – Rain forecast occasionally reported as `n/a`
+### KI-005 – Rain forecast occasionally reported as `n/a`
 **Affected version(s):** v0.1.0 - v0.2.0   
 **Affected modules:** RainEngine, f1_udp  
 
@@ -132,7 +113,7 @@ Forecast pre-buffering using a minimum number of samples.
 
 ## 🟨 Low Issues
 
-### KI-007 – Strategy Cards are currently placeholders
+### KI-006 – Strategy Cards are currently placeholders
 **Affected version(s):** v0.1.0 - v0.2.0   
 **Affected modules:** UI  
 
@@ -152,7 +133,7 @@ Connect to real strategy outputs.
 
 ## 🧪 Experimental / Design-related Limitations
 
-### KI-008 – Field deltas not always available
+### KI-007 – Field deltas not always available
 **Affected version(s):** v0.1.0 - v0.2.0   
 **Affected modules:** RainEngine  
 
@@ -168,7 +149,7 @@ By design – sufficient sample size is required.
 
 ---
 
-### KI-009 – Tyre wear learning requires sufficient data
+### KI-008 – Tyre wear learning requires sufficient data
 **Affected version(s):** v0.1.0 - v0.2.0  
 **Affected modules:** Degradation Model  
 
