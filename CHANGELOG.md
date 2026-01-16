@@ -12,10 +12,10 @@ Semantic Versioning (in an early 0.x stage).
 - None
 
 ### Changed
-- None
+- outsourcing of elements for smaller files
 
 ### Fixed
-- 
+- None
 
 ---
 ## [0.2.1] - 2026-01-16
