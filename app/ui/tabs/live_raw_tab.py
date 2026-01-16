@@ -1,6 +1,7 @@
 from __future__ import annotations
 from PySide6 import QtWidgets
 
+from app.ui.widgets.live_header_widget import LiveHeaderWidget
 from app.ui.widgets.minisector_widget import MiniSectorWidget
 from app.ui.widgets.strategy_cards_widget import StrategyCardsWidget
 
@@ -21,46 +22,22 @@ class LiveRawTabWidget(QtWidgets.QWidget):
         live_outer.setContentsMargins(10, 10, 10, 10)
         live_outer.setSpacing(10)
 
-        # --- Live group header ---
-        self.grpLive = QtWidgets.QGroupBox(self.tr.t("live.group_title", "Live (F1 UDP)"))
-        live_outer.addWidget(self.grpLive)
+        # --- Live header widget (extracted) ---
+        self.liveHeaderWidget = LiveHeaderWidget(self.tr, parent=self)
+        live_outer.addWidget(self.liveHeaderWidget)
 
-        liveLayout = QtWidgets.QGridLayout(self.grpLive)
-        liveLayout.setColumnStretch(0, 0)
-        liveLayout.setColumnStretch(1, 1)
-        liveLayout.setColumnStretch(2, 1)
-        liveLayout.setColumnStretch(3, 2)
-
-        self.lblSC = QtWidgets.QLabel(
-            self.tr.t("live.sc_fmt", "SC/VSC: {status}").format(status=self.tr.t("common.na", "n/a"))
-        )
-        self.lblWeather = QtWidgets.QLabel(self.tr.t("live.weather_na", "Weather: n/a"))
-        self.lblRain = QtWidgets.QLabel(self.tr.t("live.rain_na", "Rain(next): n/a"))
-
-        for w in (self.lblSC, self.lblWeather, self.lblRain):
-            w.setMinimumWidth(220)
-
-        # Advice prominent
-        self.lblRainAdvice = QtWidgets.QLabel(self.tr.t("live.rain_pit_na", "Rain pit: n/a"))
-        self.lblRainAdvice.setStyleSheet("font-weight: 700;")
-        self.lblRainAdvice.setMinimumWidth(360)
-
-        self.lblFieldShare = QtWidgets.QLabel(self.tr.t("live.field_share_na", "Field: Inter/Wet share: n/a"))
-        self.lblFieldDelta = QtWidgets.QLabel(self.tr.t("live.field_delta_na", "Field: Δpace (I-S): n/a"))
-        self.lblFieldShare.setMinimumWidth(240)
-        self.lblFieldDelta.setMinimumWidth(240)
-
-        liveLayout.addWidget(self.lblSC, 0, 0)
-        liveLayout.addWidget(self.lblWeather, 0, 1)
-        liveLayout.addWidget(self.lblRain, 0, 2)
-        liveLayout.addWidget(self.lblRainAdvice, 0, 3)
-
-        liveLayout.addWidget(self.lblFieldShare, 1, 0, 1, 2)
-        liveLayout.addWidget(self.lblFieldDelta, 1, 2, 1, 2)
+        # IMPORTANT: Keep legacy attribute names so MainWindow logic remains unchanged
+        self.grpLive = self.liveHeaderWidget
+        self.lblSC = self.liveHeaderWidget.lblSC
+        self.lblWeather = self.liveHeaderWidget.lblWeather
+        self.lblRain = self.liveHeaderWidget.lblRain
+        self.lblRainAdvice = self.liveHeaderWidget.lblRainAdvice
+        self.lblFieldShare = self.liveHeaderWidget.lblFieldShare
+        self.lblFieldDelta = self.liveHeaderWidget.lblFieldDelta
 
         # --- Strategy cards widget (extracted) ---
         self.strategyCardsWidget = StrategyCardsWidget(self.tr, parent=self)
-        live_outer.addWidget(self.strategyCardsWidget, 0)
+        live_outer.addWidget(self.strategyCardsWidget)
 
         # IMPORTANT: Keep legacy attribute names so MainWindow logic remains unchanged
         self.grpStrat = self.strategyCardsWidget
@@ -80,15 +57,13 @@ class LiveRawTabWidget(QtWidgets.QWidget):
 
     def retranslate(self):
         """Called by MainWindow when language changes."""
-        self.grpLive.setTitle(self.tr.t("live.group_title", "Live (F1 UDP)"))
+        try:
+            self.liveHeaderWidget.retranslate()
+        except Exception:
+            pass
+
         try:
             self.strategyCardsWidget.retranslate()
         except Exception:
             pass
 
-        self.lblSC.setText(self.tr.t("live.sc_na", "SC/VSC: n/a"))
-        self.lblWeather.setText(self.tr.t("live.weather_na", "Weather: n/a"))
-        self.lblRain.setText(self.tr.t("live.rain_na", "Rain(next): n/a"))
-        self.lblRainAdvice.setText(self.tr.t("live.rain_pit_na", "Rain pit: n/a"))
-        self.lblFieldShare.setText(self.tr.t("live.field_share_na", "Field: Inter/Wet share: n/a"))
-        self.lblFieldDelta.setText(self.tr.t("live.field_delta_na", "Field: Δpace (I-S): n/a"))
