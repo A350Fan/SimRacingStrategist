@@ -1,9 +1,8 @@
 from __future__ import annotations
 from PySide6 import QtWidgets
 
-from app.strategy import generate_placeholder_cards
 from app.ui.widgets.minisector_widget import MiniSectorWidget
-
+from app.ui.widgets.strategy_cards_widget import StrategyCardsWidget
 
 
 class LiveRawTabWidget(QtWidgets.QWidget):
@@ -59,42 +58,13 @@ class LiveRawTabWidget(QtWidgets.QWidget):
         liveLayout.addWidget(self.lblFieldShare, 1, 0, 1, 2)
         liveLayout.addWidget(self.lblFieldDelta, 1, 2, 1, 2)
 
-        # --- Strategy cards group ---
-        self.grpStrat = QtWidgets.QGroupBox(self.tr.t("cards.group_title", "Strategy Cards (Prototype)"))
-        self.grpStrat.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Expanding,
-            QtWidgets.QSizePolicy.Policy.Minimum
-        )
-        live_outer.addWidget(self.grpStrat, 0)
+        # --- Strategy cards widget (extracted) ---
+        self.strategyCardsWidget = StrategyCardsWidget(self.tr, parent=self)
+        live_outer.addWidget(self.strategyCardsWidget, 0)
 
-        stratLayout = QtWidgets.QHBoxLayout(self.grpStrat)
-        stratLayout.setSpacing(10)
-
-        self.cardWidgets = []
-        cards = generate_placeholder_cards()
-        for c in cards:
-            w = QtWidgets.QGroupBox(c.name)
-            v = QtWidgets.QVBoxLayout(w)
-
-            lbl_desc = QtWidgets.QLabel(c.description)
-            lbl_desc.setWordWrap(True)
-
-            lbl_plan = QtWidgets.QLabel(f"{self.tr.t('cards.tyres_prefix', 'Tyres:')} {c.tyre_plan}")
-            lbl_plan.setStyleSheet("font-weight: 700;")
-
-            v.addWidget(lbl_desc)
-            v.addWidget(lbl_plan)
-
-            if c.next_pit_lap is not None:
-                v.addWidget(QtWidgets.QLabel(
-                    self.tr.t("cards.next_pit_fmt", "Next pit: Lap {lap}").format(lap=c.next_pit_lap)
-                ))
-
-            v.addStretch(1)
-            w.setMinimumWidth(260)
-
-            stratLayout.addWidget(w)
-            self.cardWidgets.append(w)
+        # IMPORTANT: Keep legacy attribute names so MainWindow logic remains unchanged
+        self.grpStrat = self.strategyCardsWidget
+        self.cardWidgets = self.strategyCardsWidget.cardWidgets
 
         # --- Minisectors widget (extracted) ---
         self.miniSectorWidget = MiniSectorWidget(parent=self)
@@ -111,7 +81,10 @@ class LiveRawTabWidget(QtWidgets.QWidget):
     def retranslate(self):
         """Called by MainWindow when language changes."""
         self.grpLive.setTitle(self.tr.t("live.group_title", "Live (F1 UDP)"))
-        self.grpStrat.setTitle(self.tr.t("cards.group_title", "Strategy Cards (Prototype)"))
+        try:
+            self.strategyCardsWidget.retranslate()
+        except Exception:
+            pass
 
         self.lblSC.setText(self.tr.t("live.sc_na", "SC/VSC: n/a"))
         self.lblWeather.setText(self.tr.t("live.weather_na", "Weather: n/a"))
