@@ -1003,16 +1003,28 @@ class MainWindow(QtWidgets.QMainWindow):
 
             ms_map: dict[int, int | str] = {}
             minis_sum = 0
+            ms01_estimated = 0
+
             for m in minis:
                 no = m.get("ms_no")
                 v = m.get("split_ms")
+                est = bool(m.get("estimated"))
+
                 if no is None:
                     continue
+
                 if v is None:
                     ms_map[int(no)] = ""
                 else:
                     iv = int(v)
-                    ms_map[int(no)] = iv
+
+                    # Mark only MS01 with '*' (visual hint in CSV).
+                    if est and int(no) == 1:
+                        ms01_estimated = 1
+                        ms_map[int(no)] = f"{iv}*"
+                    else:
+                        ms_map[int(no)] = iv
+
                     minis_sum += iv
 
             ms_cols = [f"MS{n:02d}_ms" for n in range(1, total_minis + 1)]
@@ -1047,14 +1059,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 "track_flag",
                 "player_fia_flag",
 
-                # NEW:
                 "fuel_in_tank",
                 "fuel_remaining_laps",
                 "wear_fl_pct",
                 "wear_fr_pct",
                 "wear_rl_pct",
                 "wear_rr_pct",
-
+                "ms01_estimated",
                 "complete",
                 "missing_minisectors",
                 "minis_sum_ms",
@@ -1430,10 +1441,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
             cur_row = mini_to_table_row(cur_mi) if cur_mi is not None else None
 
-            def fmt(ms):
+            def fmt(ms, est: bool = False):
+                """Format milliseconds as seconds text, with optional '*' marker for estimated values."""
                 if ms is None:
                     return "—"
-                return f"{ms/1000.0:.3f}"
+                txt = f"{ms / 1000.0:.3f}"
+                return f"{txt}*" if est else txt
 
             def set_readable_text_color(item: QtWidgets.QTableWidgetItem, bg: QtGui.QColor):
                 # perceived luminance (0..255)
@@ -1448,7 +1461,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
                 # base cells
                 self.tblMini.setItem(i, 0, QtWidgets.QTableWidgetItem(f"{mi + 1:02d}"))
-                self.tblMini.setItem(i, 1, QtWidgets.QTableWidgetItem(fmt(r.last_ms)))
+                self.tblMini.setItem(
+                    i, 1,
+                    QtWidgets.QTableWidgetItem(fmt(r.last_ms, getattr(r, "last_estimated", False)))
+                )
                 self.tblMini.setItem(i, 2, QtWidgets.QTableWidgetItem(fmt(r.pb_ms)))
                 self.tblMini.setItem(i, 3, QtWidgets.QTableWidgetItem(fmt(r.best_ms)))
 

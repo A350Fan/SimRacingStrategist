@@ -9,11 +9,14 @@ TOTAL_MINIS = 3 * MINIS_PER_SECTOR
 def _clamp(x: float, a: float, b: float) -> float:
     return a if x < a else b if x > b else x
 
-
 @dataclass
 class MiniRow:
     idx: int
     last_ms: Optional[int] = None
+
+    # If True, last_ms was not measured directly but derived (fallback).
+    # We only use this as a safety net when a lap would otherwise be unusable.
+    last_estimated: bool = False
 
     # "When did this minisector finish in the CURRENT lap timeline?"
     # Used to roll back only affected minisectors on flashback/rewind.
@@ -21,8 +24,6 @@ class MiniRow:
 
     pb_ms: Optional[int] = None
     best_ms: Optional[int] = None  # session best (for now: same as pb; later can be "best of all cars")
-
-
 
 @dataclass
 class MiniSectorTracker:
@@ -107,12 +108,69 @@ class MiniSectorTracker:
             "complete": bool(complete),
         }
 
-
     def reset_lap(self, cur_lap_time_ms: Optional[int]) -> None:
+        # Start a new lap timeline: Last values are per-lap, PB/Best are session-wide.
+        # Clearing Last here prevents stale minisector times from leaking into the next lap
+        # when we miss early ticks (which is the root cause for MS1 being "empty" or wrong).
+        for r in self._rows:
+            r.last_ms = None
+            r.last_end_ms = None
+            r.last_estimated = False
+
         self._cur_idx = None
         self._last_split_ms = 0 if isinstance(cur_lap_time_ms, int) else None
         self._last_seen_lap_ms = None
         self._partial_split = True
+
+        # Distance bookkeeping for the new lap
+        self._last_split_dist_m = None
+        self._last_seen_dist_m = None
+
+    def _maybe_estimate_ms1_from_lap_time(self, lap_time_ms: Optional[int]) -> None:
+        """
+        Fallback for the (common) case where MS01 is missing because the first UDP tick
+        of the lap arrives late.
+
+        If we have a reliable total lap time AND all other minisectors (MS02..MS30)
+        are present, we can derive:
+            MS01 = lap_time_ms - sum(MS02..MS30)
+
+        This keeps lap time / delta / prediction features usable, but we mark it as estimated.
+        """
+        if lap_time_ms is None:
+            return
+
+        try:
+            lt = int(lap_time_ms)
+        except Exception:
+            return
+
+        if lt <= 0:
+            return
+
+        # Only if MS01 is missing and MS02..MS30 are all present.
+        if not self._rows:
+            return
+        if self._rows[0].last_ms is not None:
+            return
+
+        rest = [r.last_ms for r in self._rows[1:]]
+        if any(v is None for v in rest):
+            return
+
+        try:
+            rest_sum = int(sum(int(v) for v in rest if v is not None))
+        except Exception:
+            return
+
+        ms1 = lt - rest_sum
+
+        # sanity: minisectors should not be crazy
+        if not (120 <= ms1 <= 120_000):
+            return
+
+        self._rows[0].last_ms = int(ms1)
+        self._rows[0].last_estimated = True
 
     def rollback_last_after(self, now_ms: int) -> None:
         """
@@ -123,6 +181,7 @@ class MiniSectorTracker:
             if r.last_end_ms is not None and r.last_end_ms > now_ms:
                 r.last_ms = None
                 r.last_end_ms = None
+                r.last_estimated = False
 
     def _compute_idx(self, lap_dist_m: float, track_len_m: float, s2_m: float, s3_m: float) -> int:
         # normalize distance into [0, track_len)
@@ -334,9 +393,15 @@ class MiniSectorTracker:
 
                 # snapshot previous lap minisectors BEFORE resetting (additive)
                 try:
+
                     prev_lap_num = int(self._last_lap_num) if self._last_lap_num is not None else None
                     prev_lap_time_ms = int(self._last_seen_lap_ms) if self._last_seen_lap_ms is not None else int(
                         cur_lap_time_ms)
+
+                    # --- MS01 fallback (only if it was missing) ---
+                    # This is intentionally conservative: it only fills MS01 when we have a complete
+                    # lap time and ALL other minisectors (MS02...MS30) are present.
+                    self._maybe_estimate_ms1_from_lap_time(prev_lap_time_ms)
                     self._completed_laps.append(self._snapshot_lap(prev_lap_num, prev_lap_time_ms))
                 except Exception:
                     pass
@@ -376,13 +441,29 @@ class MiniSectorTracker:
             # UDP tick arrives already deep into the lap (e.g. 600m / 7.5s).
             treat_as_lap_start = (
                     (ld0 is not None)
-                    and (now_ms <= 15000)
                     and (ld0 > 5.0)
-                    and (ld0 < 0.35 * tl)
+                    and (
+                            (
+                                    (now_ms <= 15000)
+                                    and (ld0 < 0.35 * tl)
+                            )
+                            or (
+                                    self._just_lapped
+                                    and (now_ms <= 120_000)
+                                    and (ld0 < 0.60 * tl)
+                            )
+                    )
             )
 
             print(
-                f"[MS INIT] now_ms={now_ms} ld0={None if ld0 is None else round(ld0, 1)} idx={idx} lap_start={treat_as_lap_start}")
+                f"[MS INIT] now_ms={now_ms} "
+                f"ld0={None if ld0 is None else round(ld0, 1)} "
+                f"idx={idx} "
+                f"lap_start={treat_as_lap_start} "
+                f"just_lapped={self._just_lapped} "
+                f"last_lap_num={self._last_lap_num} "
+                f"cur_lap_num={cur_lap_num}"
+            )
 
             if treat_as_lap_start:
                 # Backfill minisectors 0..idx-1 proportionally by distance, then start timing from start of idx.
@@ -511,7 +592,7 @@ class MiniSectorTracker:
         else:
             r.last_ms = split_ms
             r.last_end_ms = now_ms
-
+            r.last_estimated = False  # <- wichtig: echtes Messsignal überschreibt Fallback
             if r.pb_ms is None or split_ms < r.pb_ms:
                 r.pb_ms = split_ms
             if r.best_ms is None or split_ms < r.best_ms:
