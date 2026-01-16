@@ -4,6 +4,8 @@ from __future__ import annotations
 from PySide6 import QtCore, QtWidgets, QtGui
 
 from app.ui.widgets.flag_widget import FlagWidget
+from app.ui.widgets.lap_timer_widget import LapTimerWidget
+from app.ui.widgets.minisector_widget import MiniSectorWidget
 
 
 class LiveTabWidget(QtWidgets.QWidget):
@@ -85,8 +87,53 @@ class LiveTabWidget(QtWidgets.QWidget):
         # Pin top-left with alignment (row 0, col 0)
         stage_grid.addWidget(self.flagContainer, 0, 0, alignment=QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
 
+        # --- Main content (top-right) ---
+        # This holds: LapTimer (top) + Minisectors (below).
+        self.content = QtWidgets.QFrame(self.stage)
+        self.content.setObjectName("liveContent")
+        self.content.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.content.setStyleSheet("""
+            QFrame#liveContent {
+                background: rgba(18, 18, 18, 0);   /* transparent, stage shows through */
+            }
+        """)
+
+        content_lay = QtWidgets.QVBoxLayout(self.content)
+        content_lay.setContentsMargins(0, 0, 0, 0)
+        content_lay.setSpacing(10)
+
+        # (A) Live lap stopwatch
+        self.lapTimer = LapTimerWidget(self.content)
+        content_lay.addWidget(self.lapTimer, 0)
+
+        # (B) Minisectors widget (existing table-based widget for now)
+        self.miniSectorWidget = MiniSectorWidget(self.content)
+        content_lay.addWidget(self.miniSectorWidget, 1)
+
+        # Place content to the right of the flag container (row 0, col 1)
+        # Align top so it matches your ASCII mockup style.
+        stage_grid.addWidget(
+            self.content,
+            0, 1,
+            alignment=QtCore.Qt.AlignmentFlag.AlignTop | QtCore.Qt.AlignmentFlag.AlignLeft
+        )
+
+        # --- Layout behavior: left (flags) stays compact, right (content) gets the space ---
+        stage_grid.setColumnStretch(0, 0)  # flags column
+        stage_grid.setColumnStretch(1, 1)  # content column expands
+
+        stage_grid.setRowStretch(0, 0)
+        stage_grid.setRowStretch(1, 1)
+
         # Spacer to push everything else down/right later
-        stage_grid.addItem(QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding), 1, 1)
+        stage_grid.addItem(
+            QtWidgets.QSpacerItem(
+                0, 0,
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Expanding
+            ),
+            1, 1
+        )
 
         # Bottom stretch outside stage (kept)
         lay.addStretch(0)
@@ -105,9 +152,15 @@ class LiveTabWidget(QtWidgets.QWidget):
         player_flag = getattr(state, "player_fia_flag", None)
         sc_status = getattr(state, "safety_car_status", None)
 
-        # Update flag widget
+        # Update flag widget (unchanged)
         try:
             self.flagWidget.set_flags(track_flag=track_flag, player_flag=player_flag, sc_status=sc_status)
+        except Exception:
+            pass
+
+        # Feed lap timer (stopwatch / S-F detection)
+        try:
+            self.lapTimer.feed_state(state)
         except Exception:
             pass
 
