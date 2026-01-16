@@ -5,11 +5,17 @@ from datetime import datetime, timezone
 
 from PySide6 import QtCore, QtWidgets, QtGui
 
+# --- UI split: tab widgets ---
+from app.ui.tabs.live_tab import LiveTabWidget
+from app.ui.tabs.live_raw_tab import LiveRawTabWidget
+from app.ui.tabs.db_tab import DbTabWidget
+from app.ui.tabs.model_tab import ModelTabWidget
+from app.ui.tabs.settings_tab import SettingsTabWidget
+
 from app.config import load_config, save_config, AppConfig
 from app.watcher import FolderWatcher
 from app.overtake_csv import parse_overtake_csv, lap_summary
 from app.db import upsert_lap, latest_laps, distinct_tracks, laps_for_track
-from app.strategy import generate_placeholder_cards
 from app.f1_udp import F1UDPListener, F1UDPReplayListener, F1LiveState
 from app.logging_util import AppLogger
 from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop
@@ -189,310 +195,86 @@ class MainWindow(QtWidgets.QMainWindow):
         # =========================
         # TAB 1a: LIVE
         # =========================
-        tab_live = QtWidgets.QWidget()
-        self.tabs.addTab(tab_live, "Live")
-
-        live_outer = QtWidgets.QVBoxLayout(tab_live)
-        live_outer.setContentsMargins(10, 10, 10, 10)
-        live_outer.setSpacing(10)
+        self.live_raw_tab = LiveRawTabWidget(self.tr, parent=self)
+        self.tabs.addTab(self.live_raw_tab, "Live")
 
         # =========================
         # TAB 1b: LIVE RAW
         # =========================
-        tab_live = QtWidgets.QWidget()
-        self.tabs.addTab(tab_live, "Live")
+        self.live_tab = LiveTabWidget(self.tr, parent=self)
+        self.tabs.addTab(self.live_tab, "Live (Raw)")
 
-        live_outer = QtWidgets.QVBoxLayout(tab_live)
-        live_outer.setContentsMargins(10, 10, 10, 10)
-        live_outer.setSpacing(10)
+        # Expose widgets under the SAME names MainWindow logic already uses
+        self.grpLive = self.live_tab.grpLive
+        self.lblSC = self.live_tab.lblSC
+        self.lblWeather = self.live_tab.lblWeather
+        self.lblRain = self.live_tab.lblRain
+        self.lblRainAdvice = self.live_tab.lblRainAdvice
+        self.lblFieldShare = self.live_tab.lblFieldShare
+        self.lblFieldDelta = self.live_tab.lblFieldDelta
 
-        # Live group (same widgets as before, just arranged cleaner)
-        self.grpLive = QtWidgets.QGroupBox(self.tr.t("live.group_title", "Live (F1 UDP)"))
-        live_outer.addWidget(self.grpLive)
+        self.grpStrat = self.live_tab.grpStrat
+        self.cardWidgets = self.live_tab.cardWidgets
 
-        liveLayout = QtWidgets.QGridLayout(self.grpLive)
-        liveLayout.setColumnStretch(0, 0)
-        liveLayout.setColumnStretch(1, 1)
-        liveLayout.setColumnStretch(2, 1)
-        liveLayout.setColumnStretch(3, 2)
-
-        self.lblSC = QtWidgets.QLabel(
-            self.tr.t("live.sc_fmt", "SC/VSC: {status}").format(status=self.tr.t("common.na", "n/a")))
-        self.lblWeather = QtWidgets.QLabel(self.tr.t("live.weather_na", "Weather: n/a"))
-        self.lblRain = QtWidgets.QLabel(self.tr.t("live.rain_na", "Rain(next): n/a"))
-
-        for w in (self.lblSC, self.lblWeather, self.lblRain):
-            w.setMinimumWidth(220)
-
-        # Advice prominent
-        self.lblRainAdvice = QtWidgets.QLabel(self.tr.t("live.rain_pit_na", "Rain pit: n/a"))
-        self.lblRainAdvice.setStyleSheet("font-weight: 700;")
-        self.lblRainAdvice.setMinimumWidth(360)
-
-        self.lblFieldShare = QtWidgets.QLabel(self.tr.t("live.field_share_na", "Field: Inter/Wet share: n/a"))
-        self.lblFieldDelta = QtWidgets.QLabel(self.tr.t("live.field_delta_na", "Field: Δpace (I-S): n/a"))
-        self.lblFieldShare.setMinimumWidth(240)
-        self.lblFieldDelta.setMinimumWidth(240)
-
-        liveLayout.addWidget(self.lblSC, 0, 0)
-        liveLayout.addWidget(self.lblWeather, 0, 1)
-        liveLayout.addWidget(self.lblRain, 0, 2)
-        liveLayout.addWidget(self.lblRainAdvice, 0, 3)
-
-        liveLayout.addWidget(self.lblFieldShare, 1, 0, 1, 2)
-        liveLayout.addWidget(self.lblFieldDelta, 1, 2, 1, 2)
-
-        # Strategy cards (same as before)
-        self.grpStrat = QtWidgets.QGroupBox(self.tr.t("cards.group_title", "Strategy Cards (Prototype)"))
-        self.grpStrat.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Expanding,
-            QtWidgets.QSizePolicy.Policy.Minimum
-        )
-        live_outer.addWidget(self.grpStrat, 0)  # don't eat vertical space
-
-        stratLayout = QtWidgets.QHBoxLayout(self.grpStrat)
-        stratLayout.setSpacing(10)
-
-        self.cardWidgets = []
-        cards = generate_placeholder_cards()
-        for c in cards:
-            w = QtWidgets.QGroupBox(c.name)
-            v = QtWidgets.QVBoxLayout(w)
-            lbl_desc = QtWidgets.QLabel(c.description)
-            lbl_desc.setWordWrap(True)
-            lbl_plan = QtWidgets.QLabel(f"Tyres: {c.tyre_plan}")
-            lbl_plan.setStyleSheet("font-weight: 700;")
-            v.addWidget(lbl_desc)
-            v.addWidget(lbl_plan)
-
-            # Optional fields preserved if you already had them in your prototype
-            if c.next_pit_lap is not None:
-                v.addWidget(QtWidgets.QLabel(f"Next pit: Lap {c.next_pit_lap}"))
-            v.addStretch(1)
-
-            w.setMinimumWidth(260)
-            stratLayout.addWidget(w)
-            self.cardWidgets.append(w)
-
-        self.grpMini = QtWidgets.QGroupBox("Minisectors (10 per sector)")
-        live_outer.addWidget(self.grpMini, 1)  # take remaining space
-
-        ml = QtWidgets.QVBoxLayout(self.grpMini)
-
-        self.tblMini = QtWidgets.QTableWidget()
-        self.tblMini.verticalHeader().setVisible(False)
-        self.tblMini.setColumnCount(5)
-        self.tblMini.setHorizontalHeaderLabels(["Minisector", "Last", "PB", "Best", "ΔPB"])
-        self.tblMini.setRowCount(33)  # 30 minis + 2 separators + 3 sector headers (reuse separators as headers)
-        self.tblMini.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-
-        self.grpMini.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-        self.tblMini.setSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
-
-        ml.setContentsMargins(6, 6, 6, 6)
-        ml.setSpacing(6)
-
-        ml.addWidget(self.tblMini)
-
-        # --- Theo lap time summary (from minisectors) ---
-        theoRow = QtWidgets.QHBoxLayout()
-        self.lblTheoLast = QtWidgets.QLabel("Theo Last: —")
-        self.lblTheoPB = QtWidgets.QLabel("Theo PB: —")
-        self.lblTheoBest = QtWidgets.QLabel("Theo Best: —")
-        self.lblTheoMiss = QtWidgets.QLabel("")  # optional: missing minisectors
-
-        for w in (self.lblTheoLast, self.lblTheoPB, self.lblTheoBest):
-            w.setStyleSheet("font-weight: 700;")
-
-        theoRow.addWidget(self.lblTheoLast)
-        theoRow.addSpacing(12)
-        theoRow.addWidget(self.lblTheoPB)
-        theoRow.addSpacing(12)
-        theoRow.addWidget(self.lblTheoBest)
-        theoRow.addStretch(1)
-        theoRow.addWidget(self.lblTheoMiss)
-
-        ml.addLayout(theoRow)
-
-
+        self.grpMini = self.live_tab.grpMini
+        self.tblMini = self.live_tab.tblMini
+        self.lblTheoLast = self.live_tab.lblTheoLast
+        self.lblTheoPB = self.live_tab.lblTheoPB
+        self.lblTheoBest = self.live_tab.lblTheoBest
+        self.lblTheoMiss = self.live_tab.lblTheoMiss
 
         # =========================
         # TAB 2: LAPS / DB
         # =========================
-        tab_db = QtWidgets.QWidget()
-        self.tabs.addTab(tab_db, "Laps / DB")
+        self.db_tab = DbTabWidget(self.tr, on_refresh_clicked=self._refresh_db_views, parent=self)
+        self.tabs.addTab(self.db_tab, "Laps / DB")
 
-        db_outer = QtWidgets.QVBoxLayout(tab_db)
-        db_outer.setContentsMargins(10, 10, 10, 10)
-        db_outer.setSpacing(10)
-
-        # Small toolbar (optional, but helps usability)
-        db_bar = QtWidgets.QHBoxLayout()
-        db_outer.addLayout(db_bar)
-
-        self.btnRefreshDb = QtWidgets.QPushButton("Refresh")
-        self.btnRefreshDb.clicked.connect(self._refresh_db_views)
-        db_bar.addWidget(self.btnRefreshDb)
-
-        db_bar.addStretch(1)
-
-        self.tbl = QtWidgets.QTableWidget()
-        self.tbl.verticalHeader().setVisible(False)
-        self.tbl.setColumnCount(15)
-        self.tbl.setHorizontalHeaderLabels([
-            "lap",
-            "created_at",
-            "game",
-            "track",
-            "session",
-            "session_uid",
-            "tyre",
-            "weather",
-            "lap_time_s",
-            "fuel",
-            "wear_FL",
-            "wear_FR",
-            "wear_RL",
-            "wear_RR",
-            "lap_tag",
-        ])
-        self.tbl.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        db_outer.addWidget(self.tbl, 1)
+        self.btnRefreshDb = self.db_tab.btnRefreshDb
+        self.tbl = self.db_tab.tbl
 
         # =========================
         # TAB 3: MODEL
         # =========================
-        tab_model = QtWidgets.QWidget()
-        self.tabs.addTab(tab_model, "Model")
+        self.model_tab = ModelTabWidget(self.tr, on_estimate_clicked=self._on_estimate_deg, parent=self)
+        self.tabs.addTab(self.model_tab, "Model")
 
-        model_outer = QtWidgets.QVBoxLayout(tab_model)
-        model_outer.setContentsMargins(10, 10, 10, 10)
-        model_outer.setSpacing(10)
-
-        self.grpDeg = QtWidgets.QGroupBox("Degradation model")
-        model_outer.addWidget(self.grpDeg)
-
-        degLayout = QtWidgets.QGridLayout(self.grpDeg)
-
-        self.cmbTrack = QtWidgets.QComboBox()
-        self.cmbTyre = QtWidgets.QComboBox()
-        self.cmbTyre.addItems(["C1", "C2", "C3", "C4", "C5", "C6", "INTER", "WET"])
-
-        self.spinRaceLaps = QtWidgets.QSpinBox()
-        self.spinRaceLaps.setRange(1, 200)
-        self.spinRaceLaps.setValue(50)
-
-        self.spinWearThr = QtWidgets.QSpinBox()
-        self.spinWearThr.setRange(40, 99)
-        self.spinWearThr.setValue(70)
-
-        self.btnDeg = QtWidgets.QPushButton("Estimate degradation + pit windows")
-        self.lblDeg = QtWidgets.QLabel("—")
-        self.lblDeg.setWordWrap(True)
-
-        degLayout.addWidget(QtWidgets.QLabel("Track"), 0, 0)
-        degLayout.addWidget(self.cmbTrack, 0, 1)
-
-        degLayout.addWidget(QtWidgets.QLabel("Tyre"), 1, 0)
-        degLayout.addWidget(self.cmbTyre, 1, 1)
-
-        degLayout.addWidget(QtWidgets.QLabel("Race laps"), 2, 0)
-        degLayout.addWidget(self.spinRaceLaps, 2, 1)
-
-        degLayout.addWidget(QtWidgets.QLabel("Wear threshold (%)"), 3, 0)
-        degLayout.addWidget(self.spinWearThr, 3, 1)
-
-        degLayout.addWidget(self.btnDeg, 4, 0, 1, 2)
-        degLayout.addWidget(self.lblDeg, 5, 0, 1, 2)
-
-        self.btnDeg.clicked.connect(self._on_estimate_deg)
-        model_outer.addStretch(1)
+        self.grpDeg = self.model_tab.grpDeg
+        self.cmbTrack = self.model_tab.cmbTrack
+        self.cmbTyre = self.model_tab.cmbTyre
+        self.spinRaceLaps = self.model_tab.spinRaceLaps
+        self.spinWearThr = self.model_tab.spinWearThr
+        self.btnDeg = self.model_tab.btnDeg
+        self.lblDeg = self.model_tab.lblDeg
 
         # =========================
         # TAB 4: SETTINGS
         # =========================
-        tab_settings = QtWidgets.QWidget()
-        self.tabs.addTab(tab_settings, self.tr.t("tab.settings", "Settings"))
+        self.settings_tab = SettingsTabWidget(
+            self.tr,
+            self.cfg,
+            on_pick_folder=self.pick_folder,
+            on_pick_output_folder=self.pick_output_folder,
+            on_apply_settings=self.apply_settings,
+            on_apply_language=self.apply_language,
+            parent=self
+        )
+        self.tabs.addTab(self.settings_tab, self.tr.t("tab.settings", "Settings"))
 
-        s_outer = QtWidgets.QVBoxLayout(tab_settings)
-        s_outer.setContentsMargins(10, 10, 10, 10)
-        s_outer.setSpacing(10)
+        # expose settings controls used by existing logic
+        self.grpLang = self.settings_tab.grpLang
+        self.lblLang = self.settings_tab.lblLang
+        self.cmbLang = self.settings_tab.cmbLang
+        self.btnApplyLang = self.settings_tab.btnApplyLang
 
-        grp_cfg = QtWidgets.QGroupBox("Telemetry + UDP")
-        s_outer.addWidget(grp_cfg)
-        s = QtWidgets.QGridLayout(grp_cfg)
+        self.lblFolder = self.settings_tab.lblFolder
+        self.btnPick = self.settings_tab.btnPick
+        self.lblOutFolder = self.settings_tab.lblOutFolder
+        self.btnPickOut = self.settings_tab.btnPickOut
 
-        self.grpLang = QtWidgets.QGroupBox(self.tr.t("settings.language_group", "Language"))
-        s_outer.addWidget(self.grpLang)
-        gl = QtWidgets.QGridLayout(self.grpLang)
-
-        self.lblLang = QtWidgets.QLabel(self.tr.t("settings.language_label", "Language"))
-        self.cmbLang = QtWidgets.QComboBox()
-
-        # populate from lang/*.json
-        langs = self.tr.available_languages() or ["en", "de"]
-        names = Translator.language_display_names()
-
-        # build (label, code) pairs
-        items = []
-        for code in langs:
-            label = names.get(code, code)
-            items.append((label, code))
-
-        # sort by label (case-insensitive, Unicode-safe)
-        items.sort(key=lambda x: x[0].casefold())
-
-        self.cmbLang.clear()
-        for label, code in items:
-            self.cmbLang.addItem(label, code)
-
-        # restore selection from config
-        cur_lang = (self.cfg.language or "en").strip()
-        idx = self.cmbLang.findData(cur_lang)
-        if idx >= 0:
-            self.cmbLang.setCurrentIndex(idx)
-
-        self.btnApplyLang = QtWidgets.QPushButton(self.tr.t("settings.language_apply", "Apply language"))
-        self.btnApplyLang.clicked.connect(self.apply_language)
-
-        gl.addWidget(self.lblLang, 0, 0)
-        gl.addWidget(self.cmbLang, 0, 1)
-        gl.addWidget(self.btnApplyLang, 1, 0, 1, 2)
-
-
-        self.lblFolder = QtWidgets.QLabel("Telemetry Folder: (not set)")
-        self.btnPick = QtWidgets.QPushButton("Pick Folder…")
-        self.btnPick.clicked.connect(self.pick_folder)
-
-        self.lblOutFolder = QtWidgets.QLabel("Data Output Folder: (not set)")
-        self.btnPickOut = QtWidgets.QPushButton("Pick Output Folder…")
-        self.btnPickOut.clicked.connect(self.pick_output_folder)
-
-        self.chkUdpWriteLaps = QtWidgets.QCheckBox("UDP: write laps.csv (standalone)")
-
-        self.chkUdp = QtWidgets.QCheckBox("UDP enabled (F1 SC/Wetter)")
-        self.spinPort = QtWidgets.QSpinBox()
-        self.spinPort.setRange(1024, 65535)
-        self.spinPort.setSingleStep(1)
-
-        self.btnApply = QtWidgets.QPushButton("Apply Settings")
-        self.btnApply.clicked.connect(self.apply_settings)
-
-        s.addWidget(self.lblFolder, 0, 0, 1, 3)
-        s.addWidget(self.btnPick, 0, 3)
-
-        s.addWidget(self.lblOutFolder, 1, 0, 1, 3)
-        s.addWidget(self.btnPickOut, 1, 3)
-
-        s.addWidget(self.chkUdpWriteLaps, 2, 0, 1, 4)
-
-        s.addWidget(self.chkUdp, 3, 0, 1, 2)
-        s.addWidget(QtWidgets.QLabel("Port:"), 3, 2)
-        s.addWidget(self.spinPort, 3, 3)
-
-        s.addWidget(self.btnApply, 4, 0, 1, 4)
-
-        s_outer.addStretch(1)
+        self.chkUdpWriteLaps = self.settings_tab.chkUdpWriteLaps
+        self.chkUdp = self.settings_tab.chkUdp
+        self.spinPort = self.settings_tab.spinPort
+        self.btnApply = self.settings_tab.btnApply
 
         # Status bar (kept)
         self.status = QtWidgets.QStatusBar()
