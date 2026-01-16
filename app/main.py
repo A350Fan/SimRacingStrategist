@@ -8,11 +8,11 @@ from PySide6 import QtCore, QtWidgets, QtGui
 from app.config import load_config, save_config, AppConfig
 from app.watcher import FolderWatcher
 from app.overtake_csv import parse_overtake_csv, lap_summary
-from app.db import upsert_lap, latest_laps, lap_counts_by_track, distinct_tracks, laps_for_track
+from app.db import upsert_lap, latest_laps, distinct_tracks, laps_for_track
 from app.strategy import generate_placeholder_cards
 from app.f1_udp import F1UDPListener, F1UDPReplayListener, F1LiveState
 from app.logging_util import AppLogger
-from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop, recommend_rain_pit, RainPitAdvice
+from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop
 from app.rain_engine import RainEngine
 from app.translator import Translator
 from app.track_map import track_label_from_id
