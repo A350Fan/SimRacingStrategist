@@ -195,33 +195,33 @@ class MainWindow(QtWidgets.QMainWindow):
         # =========================
         # TAB 1a: LIVE
         # =========================
-        self.live_raw_tab = LiveRawTabWidget(self.tr, parent=self)
-        self.tabs.addTab(self.live_raw_tab, "Live")
+        self.live_tab = LiveRawTabWidget(self.tr, parent=self)
+        self.tabs.addTab(self.live_tab, "Live")
 
         # =========================
         # TAB 1b: LIVE RAW
         # =========================
-        self.live_tab = LiveTabWidget(self.tr, parent=self)
-        self.tabs.addTab(self.live_tab, "Live (Raw)")
+        self.live_raw_tab = LiveTabWidget(self.tr, parent=self)
+        self.tabs.addTab(self.live_raw_tab, "Live (Raw)")
 
         # Expose widgets under the SAME names MainWindow logic already uses
-        self.grpLive = self.live_tab.grpLive
-        self.lblSC = self.live_tab.lblSC
-        self.lblWeather = self.live_tab.lblWeather
-        self.lblRain = self.live_tab.lblRain
-        self.lblRainAdvice = self.live_tab.lblRainAdvice
-        self.lblFieldShare = self.live_tab.lblFieldShare
-        self.lblFieldDelta = self.live_tab.lblFieldDelta
+        self.grpLive = self.live_raw_tab.grpLive
+        self.lblSC = self.live_raw_tab.lblSC
+        self.lblWeather = self.live_raw_tab.lblWeather
+        self.lblRain = self.live_raw_tab.lblRain
+        self.lblRainAdvice = self.live_raw_tab.lblRainAdvice
+        self.lblFieldShare = self.live_raw_tab.lblFieldShare
+        self.lblFieldDelta = self.live_raw_tab.lblFieldDelta
 
-        self.grpStrat = self.live_tab.grpStrat
-        self.cardWidgets = self.live_tab.cardWidgets
+        self.grpStrat = self.live_raw_tab.grpStrat
+        self.cardWidgets = self.live_raw_tab.cardWidgets
 
-        self.grpMini = self.live_tab.grpMini
-        self.tblMini = self.live_tab.tblMini
-        self.lblTheoLast = self.live_tab.lblTheoLast
-        self.lblTheoPB = self.live_tab.lblTheoPB
-        self.lblTheoBest = self.live_tab.lblTheoBest
-        self.lblTheoMiss = self.live_tab.lblTheoMiss
+        self.grpMini = self.live_raw_tab.grpMini
+        self.tblMini = self.live_raw_tab.tblMini
+        self.lblTheoLast = self.live_raw_tab.lblTheoLast
+        self.lblTheoPB = self.live_raw_tab.lblTheoPB
+        self.lblTheoBest = self.live_raw_tab.lblTheoBest
+        self.lblTheoMiss = self.live_raw_tab.lblTheoMiss
 
         # =========================
         # TAB 2: LAPS / DB
