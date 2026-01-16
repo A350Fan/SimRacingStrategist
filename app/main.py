@@ -281,19 +281,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatusBar(self.status)
 
     def _apply_cfg_to_ui(self):
-        if self.cfg.telemetry_root:
-            self.lblFolder.setText(f"Telemetry Folder: {self.cfg.telemetry_root}")
-        else:
-            self.lblFolder.setText("Telemetry Folder: (not set)")
-        self.chkUdp.setChecked(self.cfg.udp_enabled)
-        self.spinPort.setValue(self.cfg.udp_port)
-        if getattr(self.cfg, "udp_output_root", ""):
-            self.lblOutFolder.setText(f"Data Output Folder: {self.cfg.udp_output_root}")
-        else:
-            self.lblOutFolder.setText("Data Output Folder: (not set)")
-
-        self.chkUdpWriteLaps.setChecked(bool(getattr(self.cfg, "udp_write_csv_laps", False)))
-
+        # delegated to SettingsTabWidget (keeps behavior identical, just moved)
+        self.settings_tab.apply_cfg_to_ui()
 
     def pick_folder(self):
         d = QtWidgets.QFileDialog.getExistingDirectory(self, "Select telemetry root folder")
@@ -383,6 +372,28 @@ class MainWindow(QtWidgets.QMainWindow):
         self.lblRainAdvice.setText(self.tr.t("live.rain_pit_na", "Rain pit: n/a"))
         self.lblFieldShare.setText(self.tr.t("live.field_share_na", "Field: Inter/Wet share: n/a"))
         self.lblFieldDelta.setText(self.tr.t("live.field_delta_na", "Field: Δpace (I-S): n/a"))
+
+        # Let the split tab widgets update their internal static labels too
+        try:
+            self.live_tab.retranslate()
+        except Exception:
+            pass
+        try:
+            self.live_raw_tab.retranslate()
+        except Exception:
+            pass
+        try:
+            self.db_tab.retranslate()
+        except Exception:
+            pass
+        try:
+            self.model_tab.retranslate()
+        except Exception:
+            pass
+        try:
+            self.settings_tab.retranslate()
+        except Exception:
+            pass
 
     def _tr_keep(self, key: str, fallback: str) -> str:
         """
