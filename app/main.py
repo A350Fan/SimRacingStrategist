@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from PySide6 import QtCore, QtWidgets, QtGui
 
 # --- UI split: tab widgets ---
-from app.ui.tabs.live_tab import LiveTabWidget
 from app.ui.tabs.live_raw_tab import LiveRawTabWidget
+from app.ui.tabs.live_tab import LiveTabWidget
 from app.ui.tabs.db_tab import DbTabWidget
 from app.ui.tabs.model_tab import ModelTabWidget
 from app.ui.tabs.settings_tab import SettingsTabWidget
@@ -195,16 +195,17 @@ class MainWindow(QtWidgets.QMainWindow):
         # =========================
         # TAB 1a: LIVE
         # =========================
-        self.live_tab = LiveRawTabWidget(self.tr, parent=self)
-        self.tabs.addTab(self.live_tab, "Live")
+        self.live_tab = LiveTabWidget(self.tr, parent=self)
+        self.tabs.addTab(self.live_tab, self.tr.t("tab.live", "Live"))
 
         # =========================
         # TAB 1b: LIVE RAW
         # =========================
-        self.live_raw_tab = LiveTabWidget(self.tr, parent=self)
-        self.tabs.addTab(self.live_raw_tab, "Live (Raw)")
+        self.live_raw_tab = LiveRawTabWidget(self.tr, parent=self)
+        self.tabs.addTab(self.live_raw_tab, self.tr.t("tab.live_raw", "Live (Raw)"))
 
         # Expose widgets under the SAME names MainWindow logic already uses
+        # IMPORTANT: Bind existing logic to LIVE RAW, because LIVE (GUI) is WIP/placeholder.
         self.grpLive = self.live_raw_tab.grpLive
         self.lblSC = self.live_raw_tab.lblSC
         self.lblWeather = self.live_raw_tab.lblWeather
