@@ -88,11 +88,12 @@ class MiniSectorTracker:
         minis = []
         for r in self._rows:
             minis.append({
-                "ms_no": r.idx + 1,         # 1-based minisector number
+                "ms_no": r.idx + 1,
                 "split_ms": r.last_ms,
                 "end_ms": r.last_end_ms,
                 "pb_ms": r.pb_ms,
                 "best_ms": r.best_ms,
+                "estimated": bool(r.last_estimated),  # NEW: allows main.py to add '*' for MS01
             })
 
         missing = [m["ms_no"] for m in minis if m["split_ms"] is None]
