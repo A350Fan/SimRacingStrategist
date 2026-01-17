@@ -14,17 +14,18 @@ Legend:
 ## NOW (Stabilize the core)
 
 ### Telemetry & Data Pipeline
-- 🚧 Add a "data health" panel/log summary:
+- ✅ Add a "data health" panel/log summary:
   - ✅ CSV import status (last file, last parse time)
   - ✅ UDP status (connected, last packet age, port)
   - ✅ DB write status (last insert/update)
-- ⏳ Improve CSV robustness:
-  - handle missing/renamed columns gracefully
-  - validate multi-block structure
-  - better error messages (file + block + reason)
-- ⏳ Add basic data retention tools:
-  - clear cache button / CLI option
-  - DB export (CSV) for debugging
+- ✅ Improve CSV robustness:
+  - ✅ handle missing/renamed columns gracefully
+  - ✅ validate multi-block structure
+  - ✅ better error messages (file + block + reason)
+- 🚧 Add basic data retention tools:
+  - ✅ clear cache button
+  - ⏳CLI option
+  - ✅ DB export (CSV) for debugging
 
 ### Minisectors (F1 25)
 - ✅ Stabilize lap start detection (MS01 edge cases)
