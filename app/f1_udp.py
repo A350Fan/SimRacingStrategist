@@ -329,8 +329,7 @@ class F1UDPListener:
 
                 # GUI apps often don't show print() -> log to app.log too
                 _log.info(f"UDP dump enabled -> {str(p)}")
-                if self.debug:
-                    print(f"[DUMP] Writing UDP dump to: {str(p)}")
+                self._dbg("[DUMP] Writing UDP dump to:", str(p))
 
         except Exception as e:
             self._dump_fp = None
