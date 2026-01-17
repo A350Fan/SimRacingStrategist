@@ -184,17 +184,6 @@ class LapTimerWidget(QtWidgets.QWidget):
         """Current best lap (PB) in ms, based on our own measured laps."""
         return self._pb_ms
 
-    def get_delta_to_pb_s(self) -> float | None:
-        """
-        Current delta to PB in seconds:
-          elapsed - PB
-        Positive = slower than PB (worse), Negative = faster than PB (better).
-        """
-        ms = self._elapsed_ms()
-        if ms is None or self._pb_ms is None:
-            return None
-        return (ms - self._pb_ms) / 1000.0
-
     def feed_state(self, state: object) -> None:
         """
         Called from UI thread (queued signal).
@@ -273,30 +262,50 @@ class LapTimerWidget(QtWidgets.QWidget):
     # -------------------------------------------------
     def _norm_dist(self, dist_m: float) -> float | None:
         """
-        Normalize lap distance into [0, track_len).
-        Needs track length to be meaningful.
+        Normalize lap distance into a stable "within-lap" distance.
+
+        Preferred (wenn TrackLength bekannt):
+          - d in [0, track_len)
+
+        Fallback (wenn TrackLength fehlt):
+          - benutze dist_m direkt (Codemasters liefert i.d.R. schon lapDistance ab S/F)
+          - clamp auf >= 0 und plausibilisieren
         """
         if dist_m is None:
             return None
+
         try:
             d = float(dist_m)
         except Exception:
             return None
 
-        tl = self._track_len_m
-        if tl is None:
-            return None
-        try:
-            tl = float(tl)
-        except Exception:
-            return None
-        if tl <= 0:
-            return None
-
-        # keep inside lap domain
-        d = d % tl
+        # Plausi: negative Werte weg (manche Replays/Glitches)
         if d < 0:
             d = 0.0
+
+        tl = self._track_len_m
+        if tl is not None:
+            try:
+                tl_f = float(tl)
+            except Exception:
+                tl_f = None
+
+            if tl_f is not None and tl_f > 100.0:
+                # normaler Weg: sauber auf TrackLength normalisieren
+                d = d % tl_f
+                if d < 0:
+                    d = 0.0
+                return d
+
+        # --------
+        # Fallback ohne TrackLength:
+        # - Distanz muss innerhalb einer Runde monoton steigen.
+        # - Extrem große Werte sind fast sicher Müll -> verwerfen.
+        # (25 km ist schon sehr großzügig)
+        # --------
+        if d > 25_000.0:
+            return None
+
         return d
 
     def _trace_reset_for_new_lap(self) -> None:
@@ -313,9 +322,18 @@ class LapTimerWidget(QtWidgets.QWidget):
         if dist_m is None or elapsed_ms is None:
             return
 
-        # If distance goes backwards a lot (flashback/rewind/jitter), reset trace
-        if self._last_trace_dist is not None and (dist_m + 5.0) < self._last_trace_dist:
-            self._trace_reset_for_new_lap()
+        # If distance goes backwards, it is usually just telemetry jitter.
+        # Only treat it as a NEW LAP / WRAP if the drop is really large.
+        if self._last_trace_dist is not None and dist_m < self._last_trace_dist:
+            drop = self._last_trace_dist - dist_m
+
+            # Large drop => real wrap / rewind
+            if drop > self._wrap_drop_m:
+                self._trace_reset_for_new_lap()
+                return  # start fresh, don't mix traces
+            else:
+                # Small drop => ignore this sample (keep monotonic trace)
+                return
 
         if self._last_trace_dist is not None and self._last_trace_ms is not None:
             dd = dist_m - self._last_trace_dist
@@ -416,12 +434,31 @@ class LapTimerWidget(QtWidgets.QWidget):
             return
 
         self._last_lap_complete_ms = lap_ms
+
+        old_pb_ms = self._pb_ms  # merken für Anzeige am Ziel
+
         if self._pb_ms is None or lap_ms < self._pb_ms:
             self._pb_ms = lap_ms
 
-            # The lap that set PB also defines our PB distance->time reference.
-            # Copy current trace so the next laps can compute "delta at same point".
-            self._pb_trace = list(self._cur_trace)
+            # Ensure PB trace has a "finish" point, otherwise interpolation clamps
+            pb = list(self._cur_trace)
+            try:
+                # best: use track length if known, else use last recorded dist
+                if self._track_len_m is not None and float(self._track_len_m) > 100.0:
+                    end_d = float(self._track_len_m) - 0.001
+                else:
+                    end_d = float(pb[-1][0]) if pb else 0.0
+
+                # append finish anchor (monotonic)
+                if not pb or end_d > pb[-1][0]:
+                    pb.append((end_d, int(lap_ms)))
+                else:
+                    # overwrite last time at last dist to match lap finish
+                    pb[-1] = (pb[-1][0], int(lap_ms))
+            except Exception:
+                pass
+
+            self._pb_trace = pb
 
         # -----------------------
         # Freeze UI for a moment
@@ -436,11 +473,11 @@ class LapTimerWidget(QtWidgets.QWidget):
             else:
                 self._frozen_lap_label = self.lblLap.text()
 
-            # Delta label at the finish line: finished lap vs PB
-            if self._pb_ms is None:
+            # Delta label at the finish line: finished lap vs (OLD) PB
+            if old_pb_ms is None:
                 self._frozen_delta_text = "Δ vs PB: —"
             else:
-                d_ms = lap_ms - self._pb_ms
+                d_ms = lap_ms - old_pb_ms
                 sign = "+" if d_ms >= 0 else "-"
                 self._frozen_delta_text = f"Δ vs PB: {sign}{abs(d_ms) / 1000.0:.3f}"
 
@@ -544,9 +581,11 @@ class LapTimerWidget(QtWidgets.QWidget):
         except Exception:
             delta_ms = None
 
+        mode = "SP"  # same-point (trace)
         # Fallback: old "gap to full PB lap time"
         if delta_ms is None:
+            mode = "LAP"  # fallback
             delta_ms = int(current_ms) - int(self._pb_ms)
 
         sign = "+" if delta_ms >= 0 else "-"
-        self.lblDelta.setText(f"Δ vs PB: {sign}{abs(delta_ms) / 1000.0:.3f}")
+        self.lblDelta.setText(f"Δ vs PB [{mode}]: {sign}{abs(delta_ms) / 1000.0:.3f}")
