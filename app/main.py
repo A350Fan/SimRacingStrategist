@@ -55,6 +55,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._build_ui()
         self._retranslate_ui()
 
+        # --- Data Health (MVP) ---
+        # Store last known states for CSV / UDP / DB.
+        self._health = {
+            "csv": {"status": "—", "last_file": "—", "ts": "—", "err": ""},
+            "udp": {"enabled": bool(self.cfg.udp_enabled), "port": int(self.cfg.udp_port), "age_s": "—"},
+            "db": {"status": "—", "ts": "—", "err": ""},
+        }
+        self._refresh_health_panel()
+
         # Log bleibt im File aktiv, aber kein UI-Debugfenster mehr.
         # (ui_sink=None => nur app.log, kein QPlainTextEdit-Spam)
         self.logger = AppLogger(ui_sink=None)
@@ -193,6 +202,42 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabs = QtWidgets.QTabWidget()
         outer.addWidget(self.tabs, 1)
 
+        # --- Data Health (MVP) ---
+        # Read-only status strip that shows: CSV / UDP / DB health at a glance.
+        self.healthFrame = QtWidgets.QFrame(root)
+        self.healthFrame.setObjectName("healthFrame")
+        self.healthFrame.setStyleSheet("""
+            QFrame#healthFrame {
+                background: rgba(18, 18, 18, 220);
+                border: 1px solid rgba(255, 255, 255, 40);
+                border-radius: 12px;
+            }
+            QLabel {
+                color: rgba(255,255,255,210);
+            }
+        """)
+
+        hf_lay = QtWidgets.QHBoxLayout(self.healthFrame)
+        hf_lay.setContentsMargins(10, 6, 10, 6)
+        hf_lay.setSpacing(14)
+
+        # CSV status (left)
+        self.lblHealthCsv = QtWidgets.QLabel("CSV: —", self.healthFrame)
+        self.lblHealthCsv.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+        hf_lay.addWidget(self.lblHealthCsv, 2)
+
+        # UDP status (center)
+        self.lblHealthUdp = QtWidgets.QLabel("UDP: —", self.healthFrame)
+        self.lblHealthUdp.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+        hf_lay.addWidget(self.lblHealthUdp, 1)
+
+        # DB status (right)
+        self.lblHealthDb = QtWidgets.QLabel("DB: —", self.healthFrame)
+        self.lblHealthDb.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+        hf_lay.addWidget(self.lblHealthDb, 1)
+
+        outer.addWidget(self.healthFrame, 0)
+
         # =========================
         # TAB 1a: LIVE
         # =========================
@@ -281,6 +326,55 @@ class MainWindow(QtWidgets.QMainWindow):
         # Status bar (kept)
         self.status = QtWidgets.QStatusBar()
         self.setStatusBar(self.status)
+
+    def _health_now_str(self) -> str:
+        """Human-readable timestamp for the health panel (local time)."""
+        try:
+            return datetime.now().strftime("%H:%M:%S")
+        except Exception:
+            return "—"
+
+    def _refresh_health_panel(self) -> None:
+        """
+        Render the current health dict into the 3 labels.
+        Keep it robust: never crash the UI because of health formatting.
+        """
+        try:
+            h = getattr(self, "_health", {}) or {}
+
+            csv_h = h.get("csv", {})
+            udp_h = h.get("udp", {})
+            db_h = h.get("db", {})
+
+            # CSV
+            csv_status = csv_h.get("status", "—")
+            csv_file = csv_h.get("last_file", "—")
+            csv_ts = csv_h.get("ts", "—")
+            csv_err = csv_h.get("err", "")
+            csv_tail = f" | {csv_err}" if csv_err else ""
+            self.lblHealthCsv.setText(f"CSV: {csv_status} | {csv_ts} | {csv_file}{csv_tail}")
+
+            # UDP (packet age comes in next step)
+            udp_enabled = udp_h.get("enabled", False)
+            udp_port = udp_h.get("port", "—")
+            udp_age = udp_h.get("age_s", "—")
+            self.lblHealthUdp.setText(f"UDP: {'ON' if udp_enabled else 'OFF'} | port {udp_port} | age {udp_age}")
+
+            # DB
+            db_status = db_h.get("status", "—")
+            db_ts = db_h.get("ts", "—")
+            db_err = db_h.get("err", "")
+            db_tail = f" | {db_err}" if db_err else ""
+            self.lblHealthDb.setText(f"DB: {db_status} | {db_ts}{db_tail}")
+
+        except Exception:
+            # Worst case: show something minimal
+            try:
+                self.lblHealthCsv.setText("CSV: —")
+                self.lblHealthUdp.setText("UDP: —")
+                self.lblHealthDb.setText("DB: —")
+            except Exception:
+                pass
 
     def _apply_cfg_to_ui(self):
         # delegated to SettingsTabWidget (keeps behavior identical, just moved)
@@ -1464,13 +1558,28 @@ class MainWindow(QtWidgets.QMainWindow):
             self.logger.info(f"Skipped (qualifying not used for strategy): {src.name}")
             return
 
-        
-        self.logger.info(f"CSV seen: {src}")
-        self.logger.info(f"Cached as: {cached}")
+        # Health: CSV seen (we set status first, then refine to OK/FAIL)
+        try:
+            self._health["csv"]["status"] = "SEEN"
+            self._health["csv"]["last_file"] = src.name
+            self._health["csv"]["ts"] = self._health_now_str()
+            self._health["csv"]["err"] = ""
+            self._refresh_health_panel()
+        except Exception:
+            pass
 
         try:
             # 1) NEW: try your own UDP lap CSV format first
             if self._import_own_udp_lap_csv(src, cached):
+                # Health: CSV import OK
+                try:
+                    self._health["csv"]["status"] = "OK"
+                    self._health["csv"]["ts"] = self._health_now_str()
+                    self._health["csv"]["err"] = ""
+                    self._refresh_health_panel()
+                except Exception:
+                    pass
+
                 QtCore.QMetaObject.invokeMethod(self, "_after_db_update", QtCore.Qt.QueuedConnection)
                 return
 
@@ -1513,10 +1622,39 @@ class MainWindow(QtWidgets.QMainWindow):
                 f"weather={summ.get('weather')} lap_time_s={summ.get('lap_time_s')}"
             )
 
+            # Health: CSV import OK
+            try:
+                self._health["csv"]["status"] = "OK"
+                self._health["csv"]["ts"] = self._health_now_str()
+                self._health["csv"]["err"] = ""
+                self._refresh_health_panel()
+            except Exception:
+                pass
+
             QtCore.QMetaObject.invokeMethod(self, "_after_db_update", QtCore.Qt.QueuedConnection)
 
         except Exception as e:
+
             self.logger.error(f"IMPORT FAILED for {src.name}: {type(e).__name__}: {e}")
+
+            # Health: CSV import FAIL (short reason)
+
+            try:
+                reason = f"{type(e).__name__}: {e}"
+
+                # keep it short to avoid UI spam
+                if len(reason) > 120:
+                    reason = reason[:117] + "..."
+
+                self._health["csv"]["status"] = "FAIL"
+                self._health["csv"]["last_file"] = src.name
+                self._health["csv"]["ts"] = self._health_now_str()
+                self._health["csv"]["err"] = reason
+                self._refresh_health_panel()
+
+            except Exception:
+                pass
+
             QtCore.QMetaObject.invokeMethod(
                 self.status, "showMessage", QtCore.Qt.QueuedConnection,
                 QtCore.Q_ARG(str, f"CSV import failed: {src.name} ({type(e).__name__}: {e})"),
@@ -1525,10 +1663,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def _after_db_update(self):
+        # Health: DB write OK (we mark whenever a CSV import triggers a DB refresh)
+        try:
+            self._health["db"]["status"] = "OK"
+            self._health["db"]["ts"] = self._health_now_str()
+            self._health["db"]["err"] = ""
+            self._refresh_health_panel()
+        except Exception:
+            pass
+
         self._refresh_track_combo()
         self._refresh_db_views()
         self.status.showMessage("DB updated from new CSV.", 2500)
-
 
     def _refresh_db_views(self):
         rows = latest_laps(800)
