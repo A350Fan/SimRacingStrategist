@@ -341,6 +341,19 @@ class F1UDPListener:
             _log.error(f"UDP dump init failed: {type(e).__name__}: {e}")
         # ---------------------------------------------
 
+    def _dbg(self, *parts, throttle_s: float = 1.0) -> None:
+        if not self.debug:
+            return
+        try:
+            now = time.time()
+            if throttle_s is not None and (now - self._dbg_last_ts) < float(throttle_s):
+                return
+            self._dbg_last_ts = now
+            msg = " ".join(str(p) for p in parts)
+            self._log.info(msg)
+        except Exception:
+            pass
+
     def start(self):
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
