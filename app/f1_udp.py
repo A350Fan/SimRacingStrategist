@@ -1855,7 +1855,7 @@ class F1UDPReplayListener(F1UDPListener):
             if self.debug and self._game_profile:
                 self._dbg(
                     f"[GAME] Using profile: {self._game_profile.name} "
-                    f"(packetFormat={hdr.get('packetFormat')})"
+                    f"(packetFormat={hdr.get('packetFormat')})", throttle_s=5.0
                 )
 
         if self._session_uid != self._last_session_uid:
