@@ -1450,11 +1450,12 @@ class F1UDPListener:
         self.state.field_total_cars = len(active_idx)
         self.state.unknown_tyre_count = unknown
 
-        if self.debug:
-            print(
-                "[TYRE DEBUG] field_total:", len(active_idx),
-                "inter:", inter, "wet:", wet, "slick:", slick, "unknown:", unknown
-            )
+        self._dbg(
+            "[TYRE DEBUG] field_total:",
+            len(active_idx),
+            "inter:", inter, "wet:", wet, "slick:", slick, "unknown:", unknown,
+            throttle_s=2.0,
+        )
 
         # compat: inter_share == (INTER+WET)/(SLICK+INTER+WET)  [unknown excluded]
         self.state.inter_share = (interwet / denom) if denom > 0 else 0.0
