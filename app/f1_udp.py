@@ -393,6 +393,24 @@ class F1UDPListener:
             return a
         return self.get_last_replay_packet_age_s()
 
+    # ------------------------------------------------------------
+    # (QoL): Alias-Namen für leichteres Suchen
+    # ------------------------------------------------------------
+    def udp_age_s(self) -> Optional[float]:
+        """
+        Alias für die "eine" UDP-Age, die viele intuitiv als `udp_age` suchen.
+        Entspricht get_last_packet_age_s().
+        """
+        return self.get_last_packet_age_s()
+
+    def udp_live_age_s(self) -> Optional[float]:
+        """Alias für LIVE-Age (wie get_last_live_packet_age_s)."""
+        return self.get_last_live_packet_age_s()
+
+    def udp_replay_age_s(self) -> Optional[float]:
+        """Alias für REPLAY-Age (wie get_last_replay_packet_age_s)."""
+        return self.get_last_replay_packet_age_s()
+
     def _handle_packet(self, pid, hdr, data: bytes) -> None:
 
         if pid == 1:
