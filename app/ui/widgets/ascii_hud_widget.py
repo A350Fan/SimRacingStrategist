@@ -359,13 +359,17 @@ class AsciiHudWidget(QtWidgets.QFrame):
         pass
 
         # --- Live delta (prefer state value, fallback to LapTimerWidget delta) ---
-        delta_s = (
-                getattr(state, "live_delta_to_pb_s", None)
-                or getattr(state, "delta_to_pb_s", None)
-                or getattr(state, "delta_s", None)
-        )
+        # Prefer "delta at same point" from LapTimerWidget (distance->time PB trace).
+        # This avoids showing "gap to full PB lap time".
+        dist_m = getattr(state, "player_lap_distance_m", None)
 
-        # Fallback: LapTimerWidget already knows PB + elapsed, so we can always draw the bar
+        delta_s = None
+        try:
+            delta_s = self.lapTimer.get_live_delta_to_pb_s(dist_m)
+        except Exception:
+            delta_s = None
+
+        # If we don't have a PB trace yet, fall back to simple elapsed - PB(lap)
         if delta_s is None:
             try:
                 delta_s = self.lapTimer.get_delta_to_pb_s()

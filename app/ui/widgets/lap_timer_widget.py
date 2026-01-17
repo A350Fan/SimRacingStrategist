@@ -49,7 +49,30 @@ class LapTimerWidget(QtWidgets.QWidget):
         self._running = False
         self._lap_start_t = 0.0            # time.monotonic() at lap start
         self._last_lap_complete_ms = None  # last completed lap time (our measurement)
+
         self._pb_ms = None                 # best lap time (our measurement)
+
+        # crossing detection helpers
+        self._last_lap_num = None
+        self._last_dist_m = None
+        self._track_len_m = None
+
+        # -------------------------------------------------
+        # distance->time traces for "delta at same point"
+        # -------------------------------------------------
+        # current lap trace: list of (dist_m, elapsed_ms)
+        self._cur_trace: list[tuple[float, int]] = []
+
+        # PB trace: list of (dist_m, elapsed_ms) from the lap that set _pb_ms
+        self._pb_trace: list[tuple[float, int]] = []
+
+        # sampling guards (avoid millions of points if UI updates faster)
+        self._last_trace_dist: float | None = None
+        self._last_trace_ms: int | None = None
+
+        # tune: record a point if we moved at least X meters OR time advanced by Y ms
+        self._trace_min_dist_m = 2.0
+        self._trace_min_dt_ms = 50
 
         # -----------------------
         # "cooldown" display hold
@@ -62,11 +85,6 @@ class LapTimerWidget(QtWidgets.QWidget):
         self._frozen_ms: int | None = None
         self._frozen_delta_text: str | None = None
         self._frozen_lap_label: str | None = None
-
-        # crossing detection helpers
-        self._last_lap_num = None
-        self._last_dist_m = None
-        self._track_len_m = None
 
         # Heuristics:
         # - "wrap" detection (distance suddenly drops a lot)
@@ -207,6 +225,20 @@ class LapTimerWidget(QtWidgets.QWidget):
             completed_lap_num = self._last_lap_num if self._last_lap_num is not None else self._safe_int(lap_num)
             self._complete_lap_and_restart(completed_lap_num=completed_lap_num)
 
+        # -------------------------
+        # sample trace (60 Hz)
+        # -------------------------
+        # We sample *after* potential lap start is running.
+        try:
+            cur_ms = self._elapsed_ms()
+            d = self._safe_float(dist_m)
+            if cur_ms is not None and d is not None:
+                nd = self._norm_dist(d)
+                if nd is not None:
+                    self._trace_add_point(nd, int(cur_ms))
+        except Exception:
+            pass
+
         # Remember last values for next detection step
         self._last_lap_num = self._safe_int(lap_num) if lap_num is not None else self._last_lap_num
         self._last_dist_m = self._safe_float(dist_m) if dist_m is not None else self._last_dist_m
@@ -225,6 +257,127 @@ class LapTimerWidget(QtWidgets.QWidget):
             return float(v)
         except Exception:
             return None
+
+    # -------------------------------------------------
+    # NEW: Trace helpers (distance -> time)
+    # -------------------------------------------------
+    def _norm_dist(self, dist_m: float) -> float | None:
+        """
+        Normalize lap distance into [0, track_len).
+        Needs track length to be meaningful.
+        """
+        if dist_m is None:
+            return None
+        try:
+            d = float(dist_m)
+        except Exception:
+            return None
+
+        tl = self._track_len_m
+        if tl is None:
+            return None
+        try:
+            tl = float(tl)
+        except Exception:
+            return None
+        if tl <= 0:
+            return None
+
+        # keep inside lap domain
+        d = d % tl
+        if d < 0:
+            d = 0.0
+        return d
+
+    def _trace_reset_for_new_lap(self) -> None:
+        """Start a fresh trace for the new lap."""
+        self._cur_trace = []
+        self._last_trace_dist = None
+        self._last_trace_ms = None
+
+    def _trace_add_point(self, dist_m: float, elapsed_ms: int) -> None:
+        """
+        Add a (dist, time) sample if it is "new enough" vs last sample.
+        Assumes dist is already normalized and within [0, tl).
+        """
+        if dist_m is None or elapsed_ms is None:
+            return
+
+        # If distance goes backwards a lot (flashback/rewind/jitter), reset trace
+        if self._last_trace_dist is not None and (dist_m + 5.0) < self._last_trace_dist:
+            self._trace_reset_for_new_lap()
+
+        if self._last_trace_dist is not None and self._last_trace_ms is not None:
+            dd = dist_m - self._last_trace_dist
+            dt = elapsed_ms - self._last_trace_ms
+
+            # only store if we progressed enough in distance OR time
+            if dd < self._trace_min_dist_m and dt < self._trace_min_dt_ms:
+                return
+
+        self._cur_trace.append((float(dist_m), int(elapsed_ms)))
+        self._last_trace_dist = float(dist_m)
+        self._last_trace_ms = int(elapsed_ms)
+
+    def _interp_pb_ms_at_dist(self, dist_m: float) -> int | None:
+        """
+        Linear interpolate PB elapsed time at given distance.
+        Returns PB time in ms at that distance.
+        """
+        if not self._pb_trace:
+            return None
+
+        d = float(dist_m)
+
+        # Fast paths
+        if d <= self._pb_trace[0][0]:
+            return int(self._pb_trace[0][1])
+        if d >= self._pb_trace[-1][0]:
+            return int(self._pb_trace[-1][1])
+
+        # Find segment [i, i+1] where dist lies
+        # (pb_trace is monotonic in dist)
+        lo = 0
+        hi = len(self._pb_trace) - 1
+        while lo + 1 < hi:
+            mid = (lo + hi) // 2
+            if self._pb_trace[mid][0] <= d:
+                lo = mid
+            else:
+                hi = mid
+
+        d0, t0 = self._pb_trace[lo]
+        d1, t1 = self._pb_trace[lo + 1]
+
+        if d1 <= d0:
+            return int(t0)
+
+        # linear interpolation
+        a = (d - d0) / (d1 - d0)
+        return int(round(t0 + a * (t1 - t0)))
+
+    def get_live_delta_to_pb_s(self, dist_m: float | None) -> float | None:
+        """
+        Delta at the SAME point on track:
+          current_elapsed(dist) - pb_elapsed(dist)
+        Positive = slower, Negative = faster.
+        """
+        if dist_m is None:
+            return None
+        cur_ms = self._elapsed_ms()
+        if cur_ms is None:
+            return None
+
+        d = self._norm_dist(dist_m)
+        if d is None:
+            return None
+
+        pb_ms_at_d = self._interp_pb_ms_at_dist(d)
+        if pb_ms_at_d is None:
+            return None
+
+        return (cur_ms - pb_ms_at_d) / 1000.0
+
 
     def _start_new_lap(self) -> None:
         self._running = True
@@ -256,6 +409,10 @@ class LapTimerWidget(QtWidgets.QWidget):
         if self._pb_ms is None or lap_ms < self._pb_ms:
             self._pb_ms = lap_ms
 
+            # The lap that set PB also defines our PB distance->time reference.
+            # Copy current trace so the next laps can compute "delta at same point".
+            self._pb_trace = list(self._cur_trace)
+
         # -----------------------
         # Freeze UI for a moment
         # -----------------------
@@ -284,8 +441,11 @@ class LapTimerWidget(QtWidgets.QWidget):
             if self._frozen_delta_text:
                 self.lblDelta.setText(self._frozen_delta_text)
 
-        # Restart stopwatch for next lap (internal timing stays correct)
+        # Restart stopwatch for next lap
         self._start_new_lap()
+
+        # new lap -> new trace
+        self._trace_reset_for_new_lap()
 
         # Update delta label immediately (nice “snap” on the line)
         self._update_delta_label(current_ms=0)
