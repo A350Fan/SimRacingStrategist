@@ -1816,8 +1816,7 @@ class F1UDPReplayListener(F1UDPListener):
                     self._process_one_payload(payload)
 
         except Exception as e:
-            if self.debug:
-                print("[REPLAY] error:", repr(e))
+            self._dbg("[REPLAY] error:", repr(e), throttle_s=5.0)
 
     def _process_one_payload(self, data: bytes) -> None:
         """
