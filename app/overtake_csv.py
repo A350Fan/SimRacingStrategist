@@ -15,16 +15,93 @@ def _parse_two_line_block(header_line: str, data_line: str) -> Dict[str, str]:
         data += [""] * (len(header) - len(data))
     return {h.strip(): d.strip() for h, d in zip(header, data)}
 
+class OvertakeCSVError(ValueError):
+    """
+    Raised when an Overtake/Iko telemetry CSV cannot be parsed.
+    Includes file + block + reason for much better UI/log messages.
+    """
+    def __init__(self, path: Path, block: str, reason: str):
+        self.path = Path(path)
+        self.block = str(block)
+        self.reason = str(reason)
+        super().__init__(f"{self.path.name} | block={self.block} | {self.reason}")
+
+
+def _safe_csv_row(line: str) -> list[str]:
+    try:
+        return next(csv.reader([line]))
+    except Exception:
+        return []
+
+
+def _safe_parse_two_line_block(lines: list[str], header_i: int, data_i: int, *, path: Path, block: str) -> Dict[str, str]:
+    """
+    Try parsing a (header,data) block.
+    If indices are missing -> return {} (block missing is tolerated).
+    If present but malformed -> raise OvertakeCSVError with details.
+    """
+    if header_i >= len(lines) or data_i >= len(lines):
+        return {}
+
+    header_line = lines[header_i].strip()
+    data_line = lines[data_i].strip()
+
+    # Empty lines -> treat as missing block
+    if not header_line and not data_line:
+        return {}
+
+    # If one of those looks like telemetry header, don't treat as block
+    if header_line.startswith("LapDistance") or data_line.startswith("LapDistance"):
+        return {}
+
+    try:
+        return _parse_two_line_block(header_line, data_line)
+    except Exception as e:
+        raise OvertakeCSVError(path, block, f"Malformed 2-line block at lines {header_i+1}/{data_i+1}: {type(e).__name__}: {e}")
+
+
+def _find_telemetry_start(lines: list[str]) -> int | None:
+    """
+    Find the telemetry header start line.
+    Robust against leading spaces/BOM and minor formatting.
+    """
+    for i, raw in enumerate(lines):
+        l = (raw or "").lstrip("\ufeff").strip()
+        # strict: standard header begins with LapDistance
+        if l.startswith("LapDistance"):
+            return i
+        # fallback: sometimes there's whitespace before it
+        if "LapDistance" in l and l.split(",")[0].strip() == "LapDistance":
+            return i
+    return None
+
+
 def parse_overtake_csv(path: Path) -> Dict[str, Any]:
     """
     Parse the Overtake Telemetry Tool CSV format (multi-block).
     Returns dict with: player, game, track, setup, telemetry (DataFrame)
-    """
-    lines = path.read_text(errors="replace").splitlines()
-    if len(lines) < 10:
-        raise ValueError(f"CSV too short: {path}")
 
-    player_row = next(csv.reader([lines[0]]))
+    Robustness goals:
+    - tolerate missing/empty meta blocks
+    - give better errors: file + block + reason
+    - handle minor header formatting differences
+    """
+    try:
+        text = path.read_text(errors="replace")
+    except Exception as e:
+        raise OvertakeCSVError(path, "file", f"Cannot read file: {type(e).__name__}: {e}")
+
+    lines = text.splitlines()
+    if len(lines) < 3:
+        raise OvertakeCSVError(path, "file", f"CSV too short (lines={len(lines)})")
+
+    # --- Telemetry start index (required) ---
+    start_idx = _find_telemetry_start(lines)
+    if start_idx is None:
+        raise OvertakeCSVError(path, "telemetry", "Telemetry header 'LapDistance' not found")
+
+    # --- Player line (best-effort, optional) ---
+    player_row = _safe_csv_row(lines[0]) if lines else []
     player = {
         "raw": player_row,
         "tag": player_row[0] if len(player_row) > 0 else "",
@@ -33,20 +110,28 @@ def parse_overtake_csv(path: Path) -> Dict[str, Any]:
         "timestamp": player_row[4] if len(player_row) > 4 else "",
     }
 
-    game = _parse_two_line_block(lines[1], lines[2])
-    track = _parse_two_line_block(lines[3], lines[4])
-    setup = _parse_two_line_block(lines[5], lines[6])
+    # --- Meta blocks: best-effort (do NOT hard fail if missing) ---
+    # Typical layout: [0]=player, (1,2)=game, (3,4)=track, (5,6)=setup
+    # If those lines overlap with telemetry start or are missing, block becomes {}.
+    game = _safe_parse_two_line_block(lines, 1, 2, path=path, block="game")
+    track = _safe_parse_two_line_block(lines, 3, 4, path=path, block="track")
+    setup = _safe_parse_two_line_block(lines, 5, 6, path=path, block="setup")
 
-    start_idx = None
-    for i, l in enumerate(lines):
-        if l.startswith("LapDistance"):
-            start_idx = i
-            break
-    if start_idx is None:
-        raise ValueError(f"Telemetry header not found in: {path}")
-
+    # --- Telemetry dataframe (required, but empty is allowed) ---
     telemetry_text = "\n".join(lines[start_idx:])
-    df = pd.read_csv(io.StringIO(telemetry_text))
+    try:
+        df = pd.read_csv(io.StringIO(telemetry_text))
+    except Exception as e:
+        raise OvertakeCSVError(path, "telemetry", f"pandas.read_csv failed: {type(e).__name__}: {e}")
+
+    # Sanity: must contain LapDistance column (or a known alias)
+    if isinstance(df, pd.DataFrame):
+        if "LapDistance" not in df.columns:
+            # common aliases (just in case)
+            for alias in ("Lap Distance", "LapDistance [m]", "LapDistance[m]"):
+                if alias in df.columns:
+                    df = df.rename(columns={alias: "LapDistance"})
+                    break
 
     return {"player": player, "game": game, "track": track, "setup": setup, "telemetry": df}
 
@@ -113,22 +198,28 @@ def lap_summary(parsed: Dict[str, Any]) -> Dict[str, Any]:
                     fuel = None
                 break
 
-    # Wear: last-row values if columns exist
+    # Wear: try a couple of common column spellings/variants
     wear_map = [
-        ("TyreWearFrontLeft [%]", "wear_fl"),
-        ("TyreWearFrontRight [%]", "wear_fr"),
-        ("TyreWearRearLeft [%]", "wear_rl"),
-        ("TyreWearRearRight [%]", "wear_rr"),
+        (("TyreWearFrontLeft [%]", "Tyre Wear Front Left [%]", "TyreWearFL [%]", "TyreWearFL"), "wear_fl"),
+        (("TyreWearFrontRight [%]", "Tyre Wear Front Right [%]", "TyreWearFR [%]", "TyreWearFR"), "wear_fr"),
+        (("TyreWearRearLeft [%]", "Tyre Wear Rear Left [%]", "TyreWearRL [%]", "TyreWearRL"), "wear_rl"),
+        (("TyreWearRearRight [%]", "Tyre Wear Rear Right [%]", "TyreWearRR [%]", "TyreWearRR"), "wear_rr"),
     ]
     wear: Dict[str, Any] = {k: None for _, k in wear_map}
 
     if isinstance(df, pd.DataFrame) and not df.empty:
-        for col, out in wear_map:
-            if col in df.columns:
-                try:
-                    wear[out] = float(df[col].iloc[-1])
-                except Exception:
-                    wear[out] = None
+        for cols, out in wear_map:
+            chosen = None
+            for c in cols:
+                if c in df.columns:
+                    chosen = c
+                    break
+            if chosen is None:
+                continue
+            try:
+                wear[out] = float(df[chosen].iloc[-1])
+            except Exception:
+                wear[out] = None
 
     # ✅ IMPORTANT: Always return a dict (never None)
     return {
