@@ -1170,12 +1170,35 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
 
                 # Per-track sanity checker: unusual splits / missing indices
-                chk = self.ms.sanity_check_snapshot(
-                    lap,
-                    track_len_m=tl,
-                    sector2_start_m=s2m,
-                    sector3_start_m=s3m,
-                )
+                # --- SANITY TEST MODE (dev only) ---
+                # Set True to PROVE the checker logs warnings.
+                # Set back to False for normal operation.
+                SANITY_TEST_MODE = False
+
+                if SANITY_TEST_MODE:
+                    # Very strict: assumes every minisector should roughly match ~180 km/h.
+                    # This WILL trigger on real laps (slow corners / fast straights).
+                    chk = self.ms.sanity_check_snapshot(
+                        lap,
+                        track_len_m=tl,
+                        sector2_start_m=s2m,
+                        sector3_start_m=s3m,
+                        vmin_kmh=180.0,
+                        vmax_kmh=180.0,
+                        slack_lo=1.00,
+                        slack_hi=1.00,
+                        abs_min_ms=200,
+                        abs_max_ms=5000,
+                    )
+                else:
+                    # Normal conservative mode
+                    chk = self.ms.sanity_check_snapshot(
+                        lap,
+                        track_len_m=tl,
+                        sector2_start_m=s2m,
+                        sector3_start_m=s3m,
+                    )
+
                 if not chk.get("ok", True):
                     self.logger.info(
                         "[MS SANITY] "
