@@ -1782,8 +1782,7 @@ class F1UDPReplayListener(F1UDPListener):
     def _run(self):
         p = Path(self.replay_file)
         if not p.exists() or not p.is_file():
-            if self.debug:
-                print(f"[REPLAY] File not found: {self.replay_file}")
+            self._dbg(f"[REPLAY] File not found: {self.replay_file}", throttle_s=5.0)
             return
 
         if self.debug:
