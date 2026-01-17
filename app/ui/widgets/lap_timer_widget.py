@@ -47,10 +47,31 @@ class LapTimerWidget(QtWidgets.QWidget):
         # internal stopwatch state
         # -----------------------
         self._running = False
-        self._lap_start_t = 0.0            # time.monotonic() at lap start
+        self._lap_start_t = 0.0  # time.monotonic() at lap start
         self._last_lap_complete_ms = None  # last completed lap time (our measurement)
 
-        self._pb_ms = None                 # best lap time (our measurement)
+        self._pb_ms = None  # best lap time (our measurement)
+
+        # -----------------------
+        # NEW: Pause handling (game pause)
+        # -----------------------
+        # We detect pause via telemetry: player_current_lap_time_ms stops advancing.
+        # While paused, we freeze elapsed time and when unpausing we shift _lap_start_t
+        # forward by the paused duration (so elapsed excludes pause time).
+        self._paused = False
+        self._pause_started_t = 0.0
+
+        self._last_tel_lap_ms: int | None = None
+        self._tel_stale_since_t: float | None = None
+
+        # How long telemetry lap time must be "stuck" before we treat it as paused.
+        # (Small debounce to avoid jitter / packet hiccups.)
+        self._pause_detect_after_s = 0.25
+
+        # NEW: If the game pause menu stops UDP packets, feed_state() won't be called.
+        # Then we need a second pause detector: "no state updates for X seconds".
+        self._last_state_update_t: float | None = None
+        self._stale_pause_after_s = 0.35  # tweak if needed (0.25-0.6 typical)
 
         # crossing detection helpers
         self._last_lap_num = None
@@ -189,9 +210,19 @@ class LapTimerWidget(QtWidgets.QWidget):
         Called from UI thread (queued signal).
         Uses best-effort fields from F1LiveState.
         """
+        # Mark: we received fresh telemetry right now (important for pause detection)
+        self._last_state_update_t = time.monotonic()
+
         lap_num = getattr(state, "player_current_lap_num", None)
         dist_m = getattr(state, "player_lap_distance_m", None)
         trk_len = getattr(state, "track_length_m", None)
+
+        # NEW: telemetry-based pause detection
+        tel_lap_ms = getattr(state, "player_current_lap_time_ms", None)
+        try:
+            self._update_pause_from_telemetry(tel_lap_ms)
+        except Exception:
+            pass
 
         try:
             self._track_len_m = int(trk_len) if trk_len is not None else self._track_len_m
@@ -406,15 +437,92 @@ class LapTimerWidget(QtWidgets.QWidget):
 
         return (cur_ms - pb_ms_at_d) / 1000.0
 
+    def _update_pause_from_telemetry(self, tel_lap_ms: int | None) -> None:
+        """
+        Pause detection/resume based on telemetry lap time.
+
+        Idea:
+        - When the game is paused, F1 telemetry's "current lap time" typically stops increasing.
+        - Our UI stopwatch uses time.monotonic(), so we must freeze it while telemetry is frozen.
+
+        tel_lap_ms: state.player_current_lap_time_ms (ms), best-effort.
+        """
+        if not self._running:
+            return
+
+        now = time.monotonic()
+
+        # If we don't have this field, we can't reliably detect pause -> do nothing.
+        if tel_lap_ms is None:
+            return
+
+        try:
+            tel = int(tel_lap_ms)
+        except Exception:
+            return
+
+        # First sample -> just store
+        if self._last_tel_lap_ms is None:
+            self._last_tel_lap_ms = tel
+            self._tel_stale_since_t = None
+            return
+
+        if tel != self._last_tel_lap_ms:
+            # Telemetry is advancing -> resume if we were paused
+            self._last_tel_lap_ms = tel
+            self._tel_stale_since_t = None
+
+            if self._paused:
+                # Shift lap start forward by the paused duration so elapsed excludes pause
+                paused_dt = max(0.0, now - self._pause_started_t)
+                self._lap_start_t += paused_dt
+                self._paused = False
+            return
+
+        # Telemetry is stuck (same ms as last time) -> maybe paused
+        if self._tel_stale_since_t is None:
+            self._tel_stale_since_t = now
+            return
+
+        if (now - self._tel_stale_since_t) >= self._pause_detect_after_s:
+            if not self._paused:
+                self._paused = True
+                self._pause_started_t = now
 
     def _start_new_lap(self) -> None:
         self._running = True
         self._lap_start_t = time.monotonic()
 
+        # reset pause state for the new lap
+        self._paused = False
+        self._pause_started_t = 0.0
+        self._last_tel_lap_ms = None
+        self._tel_stale_since_t = None
+
+    def _update_pause_from_stale_feed(self) -> None:
+        """
+        If no feed_state() updates arrive for a while, assume the game is paused
+        (or telemetry is interrupted) and freeze the stopwatch.
+        """
+        if not self._running:
+            return
+
+        if self._last_state_update_t is None:
+            return
+
+        now = time.monotonic()
+        if (now - self._last_state_update_t) >= self._stale_pause_after_s:
+            if not self._paused:
+                self._paused = True
+                self._pause_started_t = now
+
     def _elapsed_ms(self) -> int | None:
         if not self._running:
             return None
-        return int(round((time.monotonic() - self._lap_start_t) * 1000.0))
+
+        # If paused, freeze elapsed time at the pause start moment
+        t = self._pause_started_t if self._paused else time.monotonic()
+        return int(round((t - self._lap_start_t) * 1000.0))
 
     def _complete_lap_and_restart(self, completed_lap_num: int | None = None) -> None:
         now = time.monotonic()
@@ -537,6 +645,12 @@ class LapTimerWidget(QtWidgets.QWidget):
         return False
 
     def _on_tick(self) -> None:
+        # NEW: if telemetry stopped (pause menu often stops UDP), freeze stopwatch.
+        try:
+            self._update_pause_from_stale_feed()
+        except Exception:
+            pass
+
         # If we are in "cooldown", keep showing the finished lap as a standstill.
         if self._freeze_until_t and time.monotonic() < self._freeze_until_t:
             if self._frozen_lap_label:
