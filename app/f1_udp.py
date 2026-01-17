@@ -220,6 +220,12 @@ class F1UDPListener:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
+        # --- Data Health: UDP "last packet age" ---
+        # UDP thread updates this; UI thread reads it -> protect with a lock.
+        self._last_packet_lock = threading.Lock()
+        self._last_packet_mono: Optional[float] = None  # time.monotonic() timestamp of last received packet
+        # -----------------------------------------
+
         self._deb_sc = _Debounce(n=6, max_age_s=0.7)
         self._deb_weather = _Debounce(n=6, max_age_s=0.7)
         self._deb_rain_now = _Debounce(n=6, max_age_s=0.7)
@@ -228,7 +234,7 @@ class F1UDPListener:
         self._last_lap_ms = [None] * 22
         self._tyre_cat = [None] * 22  # "SLICK" / "INTER" / "WET"
 
-        # NEW: exact label used for DB ("C1".."C6" for slicks, else "INTER"/"WET"/"SLICK").
+        # exact label used for DB ("C1"..."C6" for slicks, else "INTER"/"WET"/"SLICK").
         self._tyre_compound = [None] * 22
 
         # --- Active cars detection (LapData: resultStatus) ---
@@ -350,6 +356,24 @@ class F1UDPListener:
             pass
         self._dump_fp = None
         # ----------------------------
+
+    # -----------------------------
+    # Data Health public API
+    # -----------------------------
+    def get_last_packet_age_s(self) -> Optional[float]:
+        """
+        Returns seconds since the last UDP packet was received.
+        None means: we haven't received anything yet (or UDP is stopped).
+        Safe to call from the UI thread.
+        """
+        try:
+            with self._last_packet_lock:
+                t0 = self._last_packet_mono
+            if t0 is None:
+                return None
+            return max(0.0, time.monotonic() - float(t0))
+        except Exception:
+            return None
 
     def _handle_packet(self, pid, hdr, data: bytes) -> None:
 
@@ -1256,7 +1280,15 @@ class F1UDPListener:
             try:
                 data, _addr = sock.recvfrom(2048)
 
-                # --- NEW: write raw packet to dump file (t_rel_ms + len + payload) ---
+                # --- Data Health: remember last packet time (thread-safe) ---
+                try:
+                    with self._last_packet_lock:
+                        self._last_packet_mono = time.monotonic()
+                except Exception:
+                    pass
+                # -----------------------------------------------------------
+
+                # --- write raw packet to dump file (t_rel_ms + len + payload) ---
                 try:
                     if self._dump_fp:
                         t_ms = int(time.monotonic() * 1000)
@@ -1272,6 +1304,7 @@ class F1UDPListener:
                 # DEBUG: zeigen ob überhaupt UDP ankommt
                 if self.debug:
                     print("RX", len(data))
+
 
             except socket.timeout:
                 continue
@@ -1325,789 +1358,6 @@ class F1UDPListener:
             except Exception:
                 # never crash telemetry thread
                 pass
-
-            continue  # used to disable old code block
-
-            if pid == 1:
-                if self.debug:
-                    print("[PID1] Session packet received len=", len(data))
-
-                # basic size sanity check
-                if len(data) < 150:
-                    continue
-
-                base = int(hdr.get("headerSize", 29))  # after PacketHeader
-
-                changed = False
-
-                # SessionType + TrackId (see F1 25 spec)
-                # offsets: base+6 = sessionType (uint8), base+7 = trackId (int8)
-                try:
-                    sess_type = struct.unpack_from("<B", data, base + 6)[0]
-                    if sess_type != self.state.session_type_id:
-                        self.state.session_type_id = int(sess_type)
-                        changed = True
-                except Exception:
-                    pass
-
-                try:
-                    trk_id = struct.unpack_from("<b", data, base + 7)[0]  # int8
-                    if trk_id != self.state.track_id:
-                        self.state.track_id = int(trk_id)
-                        changed = True
-                except Exception:
-                    pass
-
-                # Track length is at base+4 (see F1 25 spec: weather/temps/totalLaps then uint16 trackLength)
-                try:
-                    track_len = struct.unpack_from("<H", data, base + 4)[0]
-                    if track_len > 0 and track_len != self.state.track_length_m:
-                        self.state.track_length_m = int(track_len)
-                        changed = True
-                except Exception:
-                    pass
-
-                # NACHDEM du self.state.track_length_m gesetzt hast (F1 25 / pkt_fmt >= 2025):
-                # Im F1 25 Spec liegen diese beiden floats am Ende vom PacketSessionData:
-                # float m_sector2LapDistanceStart; float m_sector3LapDistanceStart;
-                # -> best-effort: von hinten lesen, wenn genug Bytes da sind.
-
-                if hdr.get("packetFormat", 0) >= 2025 and len(data) >= 8:
-                    try:
-                        s2, s3 = struct.unpack_from("<ff", data, len(data) - 8)
-                        # Plausi: innerhalb Tracklänge
-                        tl = self.state.track_length_m
-                        if tl and 0.0 < s2 < tl and 0.0 < s3 < tl and s2 < s3:
-                            self.state.sector2_start_m = float(s2)
-                            self.state.sector3_start_m = float(s3)
-                    except Exception:
-                        pass
-
-                # --- Sector start distances (needed for minisectors) ---
-                # F1 25+: sector2/sector3 start are appended as 2 floats at end of session packet.
-                # Older games (e.g. 2020): not available -> optional fallback (approx thirds).
-
-                sec2 = sec3 = None
-                pf = int(hdr.get("packetFormat", 0) or 0)
-
-                # F1 25+ (your normal path)
-                if pf >= 2025 and len(data) >= 8:
-                    try:
-                        sec2, sec3 = struct.unpack_from("<ff", data, len(data) - 8)
-                    except Exception:
-                        sec2 = sec3 = None
-
-                tl = float(self.state.track_length_m or 0.0)
-
-                def _apply_sector_starts(a: float, b: float) -> None:
-                    nonlocal changed
-                    if a != self.state.sector2_start_m:
-                        self.state.sector2_start_m = float(a)
-                        changed = True
-                    if b != self.state.sector3_start_m:
-                        self.state.sector3_start_m = float(b)
-                        changed = True
-
-                # sanity + apply real values if present
-                if tl > 0 and sec2 is not None and sec3 is not None and 0.0 < sec2 < sec3 < tl:
-                    _apply_sector_starts(float(sec2), float(sec3))
-
-                # fallback ONLY for older games / when enabled in profile
-                elif tl > 0 and self._game_profile and getattr(self._game_profile, "minisector_sector_fallback", False):
-                    # crude but consistent: 1/3 and 2/3 of track length
-                    f2 = float(getattr(self._game_profile, "sector2_frac", 1.0 / 3.0))
-                    f3 = float(getattr(self._game_profile, "sector3_frac", 2.0 / 3.0))
-                    # keep sane
-                    f2 = max(0.10, min(0.60, f2))
-                    f3 = max(0.40, min(0.90, f3))
-                    if f2 < f3:
-                        _apply_sector_starts(tl * f2, tl * f3)
-
-                # --- Marshal zones / track flags (F1 25 spec) ---
-                # Your code already uses the "base + 19 + (21*5)" scheme for safetyCarStatus,
-                # so we align marshal-zone offsets to that:
-                # numMarshalZones @ base+18, marshalZones[] start @ base+19, each 5 bytes (float + int8).
-                track_flag = None
-                try:
-                    num_mz = data[base + 18]
-                    mz_start = base + 19
-                    max_flag = None
-                    for j in range(min(int(num_mz), 21)):
-                        zone_flag = struct.unpack_from("<b", data, mz_start + j * 5 + 4)[0]  # int8
-                        if zone_flag >= 0:  # ignore -1 invalid
-                            max_flag = zone_flag if max_flag is None else max(max_flag, zone_flag)
-                    track_flag = max_flag  # 0..3 or None
-                except Exception:
-                    track_flag = None
-
-                if self.state.track_flag != track_flag:
-                    self.state.track_flag = track_flag
-                    changed = True
-
-                # --- Session packet fields (F1 25 spec) ---
-                weather_raw = data[base + 0]  # 0..5
-
-                if self.debug:
-                    print("[SESSION] weather_raw", weather_raw, "trackTemp",
-                          int.from_bytes(data[base + 1:base + 2], "little", signed=True))
-
-                safety_car_off = base + 19 + (21 * 5)
-                if safety_car_off + 3 >= len(data):
-                    continue
-
-                sc_raw = data[safety_car_off]          # 0..3
-                num_fc = data[safety_car_off + 2]
-                fc_off = safety_car_off + 3
-
-                # --- Rain: current + forecast (from forecast samples) ---
-                rain_now_raw = None
-                rain_fc_raw = None
-                fc_series = []
-                self.state.rain_fc_series = None  # reset each session packet unless we fill it
-
-                #print("[RAIN RAW]", "now", rain_now_raw, "fc", rain_fc_raw, "n_fc", int(num_fc))
-
-                # fc_dbg = "fc:none"
-
-                stride = 8
-                if isinstance(num_fc, int) and num_fc > 0:
-                    need = fc_off + (num_fc * stride)
-                    if need <= len(data):
-                        for j in range(num_fc):
-                            o = fc_off + j * stride
-                            time_off_min = int(data[o + 1])  # usually minutes into future
-                            weather_fc = int(data[o + 2])  # 0..5
-                            rain_fc = int(data[o + 7])  # 0..100
-                            # guard
-                            if 0 <= time_off_min <= 240 and 0 <= weather_fc <= 5 and 0 <= rain_fc <= 100:
-                                fc_series.append((time_off_min, rain_fc, weather_fc))
-
-                        # sort + dedupe by time offset
-                        fc_series.sort(key=lambda x: x[0])
-                        dedup = []
-                        seen = set()
-                        for t, r, w in fc_series:
-                            if t in seen:
-                                continue
-                            seen.add(t)
-                            dedup.append((t, r, w))
-                        fc_series = dedup
-
-                        # "rain_fc_pct" = first sample (nearest future)
-                        if fc_series:
-                            # rain_now = sample with timeOffset==0 if present, else use the earliest sample as best-effort
-                            now_samples = [r for (t, r, w) in fc_series if t == 0]
-                            if now_samples:
-                                rain_now_raw = now_samples[0]
-
-                            # rain_fc = nearest FUTURE sample (>0). If none, fall back to first.
-                            future = [(t, r) for (t, r, w) in fc_series if t > 0]
-                            if future:
-                                future.sort(key=lambda x: x[0])
-                                rain_fc_raw = future[0][1]
-                            else:
-                                rain_fc_raw = fc_series[0][1]
-
-                    # publish series (None if empty)
-                    self.state.rain_fc_series = fc_series if fc_series else None
-
-                # Rain NOW
-                if rain_now_raw is not None:
-                    try:
-                        rain_now_i = int(rain_now_raw)
-                    except Exception:
-                        rain_now_i = None
-
-                    if rain_now_i is not None and 0 <= rain_now_i <= 100:
-                        r_now = self._deb_rain_now.update(rain_now_i)
-                        if r_now is not None and r_now != self.state.rain_now_pct:
-                            self.state.rain_now_pct = r_now
-                            changed = True
-
-                # Rain FORECAST
-                if rain_fc_raw is not None and 0 <= rain_fc_raw <= 100:
-                    r_fc = self._deb_rain_fc.update(int(rain_fc_raw))
-                    if r_fc is not None and r_fc != self.state.rain_fc_pct:
-                        self.state.rain_fc_pct = r_fc
-                        changed = True
-
-                # Weather
-                if 0 <= weather_raw <= 5:
-                    w = self._deb_weather.update(int(weather_raw))
-                    if w is not None and w != self.state.weather:
-                        self.state.weather = w
-                        changed = True
-
-                # Safety Car
-                if sc_raw in (0, 1, 2, 3):
-                    sc = self._deb_sc.update(int(sc_raw))
-                    if sc is not None and sc != self.state.safety_car_status:
-                        self.state.safety_car_status = sc
-                        changed = True
-
-                if changed:
-                    self._dirty = True
-
-            elif pid == 2:
-
-                base = int(hdr.get("headerSize", 29))
-
-                changed = False
-
-                # PacketLapData total size is 1285 bytes in F1 25 spec.
-
-                # LapData struct is exactly 57 bytes, repeated 22 times.
-
-                base = int(hdr.get("headerSize", 29))
-                pkt_fmt = int(hdr.get("packetFormat", 0))
-
-                changed = False
-
-                # ----------------------------
-                # F1 2020 LapData (1190 bytes):
-                # header 24 + 22 * 53 = 1190
-                # ----------------------------
-                if pkt_fmt == 2020:
-                    car_size = 53
-                    if len(data) < base + car_size * 22:
-                        continue
-
-                    for i in range(22):
-                        off = base + i * car_size
-
-                        try:
-                            # F1 2020: last/current lap times are float seconds
-                            last_s = struct.unpack_from("<f", data, off + 0)[0]
-                            cur_s = struct.unpack_from("<f", data, off + 4)[0]
-
-                            # sector times are uint16 ms (best-effort; ok if 0)
-                            s1_ms = struct.unpack_from("<H", data, off + 8)[0]
-                            s2_ms = struct.unpack_from("<H", data, off + 10)[0]
-
-                            # lapDistance / totalDistance are floats (metres)
-                            lap_dist_m = struct.unpack_from("<f", data, off + 32)[0]
-                            total_dist_m = struct.unpack_from("<f", data, off + 36)[0]
-
-                            # status bytes near the end
-                            lap_num = struct.unpack_from("<B", data, off + 46)[0]
-                            pit_status = struct.unpack_from("<B", data, off + 47)[0]
-                            result_status = struct.unpack_from("<B", data, off + 52)[0]
-
-                        except struct.error:
-                            continue
-
-                        # convert seconds -> ms
-                        last_ms = int(round(last_s * 1000.0)) if last_s and last_s > 0 else None
-                        cur_ms = int(round(cur_s * 1000.0)) if cur_s and cur_s > 0 else 0
-
-                        self._pit_status[i] = int(pit_status)
-                        self._result_status[i] = int(result_status)
-
-                        # update player fields
-                        if i == self._player_idx:
-                            if self.state.player_lap_distance_m != float(lap_dist_m):
-                                self.state.player_lap_distance_m = float(lap_dist_m)
-                                changed = True
-
-                            if self.state.player_current_lap_time_ms != int(cur_ms):
-                                self.state.player_current_lap_time_ms = int(cur_ms)
-                                changed = True
-
-                            if self.state.player_sector1_time_ms != int(s1_ms):
-                                self.state.player_sector1_time_ms = int(s1_ms)
-                                changed = True
-
-                            if self.state.player_sector2_time_ms != int(s2_ms):
-                                self.state.player_sector2_time_ms = int(s2_ms)
-                                changed = True
-
-                            if self.state.player_pit_status != int(pit_status):
-                                self.state.player_pit_status = int(pit_status)
-                                changed = True
-
-                            if self.state.player_current_lap_num != int(lap_num):
-                                self.state.player_current_lap_num = int(lap_num)
-                                changed = True
-
-                        # last-lap handling (for deltas/history)
-                        if last_ms is not None and last_ms < 10_000_000:
-                            prev_ms = self._last_lap_ms[i]
-                            if prev_ms != last_ms:
-                                self._last_lap_ms[i] = last_ms
-                                changed = True
-
-                                # keep your existing validity/outlap logic as-is (minimal safe)
-                                valid = True
-                                lap_flag = "OK"
-
-                                if self._pit_status[i] != 0 and last_ms >= 200_000:
-                                    valid = False
-                                    lap_flag = "IN"
-
-                                if hasattr(self, "_ignore_next_lap") and self._ignore_next_lap[i]:
-                                    looks_like_outlap = False
-                                    if isinstance(prev_ms, int) and prev_ms > 0:
-                                        if (last_ms - prev_ms) >= getattr(self, "_outlap_slow_ms", 45_000):
-                                            looks_like_outlap = True
-                                    if last_ms >= 200_000:
-                                        looks_like_outlap = True
-
-                                    if looks_like_outlap:
-                                        valid = False
-                                        lap_flag = "OUT"
-                                    self._ignore_next_lap[i] = False
-
-                                self._lap_valid[i] = valid
-                                self._lap_flag[i] = lap_flag
-
-                                if i == self._player_idx:
-                                    if self.state.player_last_lap_time_ms != last_ms:
-                                        self.state.player_last_lap_time_ms = last_ms
-                                        changed = True
-
-                                # keep per-car history buffers if present
-                                if hasattr(self, "_car_laps") and hasattr(self, "_tyre_cat"):
-                                    cat = self._tyre_cat[i]
-                                    if valid and cat in ("SLICK", "INTER", "WET"):
-                                        lap_s = last_ms / 1000.0
-                                        buf = self._car_laps[i][cat]
-                                        if self._robust_accept_lap(buf, lap_s):
-                                            buf.append(lap_s)
-
-                                if (
-                                        hasattr(self, "_your_laps")
-                                        and self._player_idx is not None
-                                        and i == self._player_idx
-                                        and hasattr(self, "_tyre_cat")
-                                ):
-                                    cat = self._tyre_cat[i]
-                                    if valid and cat in ("SLICK", "INTER", "WET"):
-                                        lap_s = last_ms / 1000.0
-                                        ybuf = self._your_laps[cat]
-                                        if self._robust_accept_lap(ybuf, lap_s):
-                                            ybuf.append(lap_s)
-
-                    if changed:
-                        self._update_field_metrics_and_emit()
-                    continue  # IMPORTANT: stop here for 2020, don’t fall through to F1 25 parser
-
-                # ----------------------------
-                # F1 25 LapData (your existing code)
-                # ----------------------------
-                car_size = 57
-                if len(data) < base + car_size * 22:
-                    continue
-
-                fmt_lap = (
-                    "<II"  # last/current lap ms
-                    "H B"  # s1 ms part, s1 min part
-                    "H B"  # s2 ms part, s2 min part
-                    "H B"  # delta front ms part, delta front min part
-                    "H B"  # delta leader ms part, delta leader min part
-                    "f f f"  # lapDistance, totalDistance, safetyCarDelta
-                    "15B"  # 15x uint8
-                    "H H"  # pitLaneTimeInLaneMS, pitStopTimerInMS
-                    "B"  # pitStopShouldServePen
-                    "f"  # speedTrapFastestSpeed (km/h)
-                    "B"  # speedTrapFastestLap
-                )
-
-                # ... ab hier bleibt dein existierender F1-25 Loop unverändert ...
-
-                for i in range(22):
-                    off = base + i * car_size
-
-                    (
-                        last_ms,
-                        cur_ms,
-
-                        s1_ms_part, s1_min_part,
-                        s2_ms_part, s2_min_part,
-
-                        d_front_ms_part, d_front_min_part,
-                        d_lead_ms_part, d_lead_min_part,
-
-                        lap_dist_m,
-                        total_dist_m,
-                        sc_delta_s,
-
-                        car_pos,
-                        lap_num,
-                        pit_status,
-                        num_pit,
-                        sector,
-                        lap_invalid,
-                        penalties,
-                        total_warn,
-                        cc_warn,
-                        unserved_dt,
-                        unserved_sg,
-                        grid_pos,
-                        driver_status,
-                        result_status,
-                        pit_lane_timer_active,
-
-                        pit_lane_time_ms,
-                        pit_stop_timer_ms,
-                        pit_should_serve_pen,
-
-                        speed_trap_fast_kmph,
-                        speed_trap_fast_lap,
-                    ) = struct.unpack_from(fmt_lap, data, off)
-
-                    # sector times are split into minutes + ms-part
-
-                    s1_ms = int(s1_ms_part) + int(s1_min_part) * 60_000
-
-                    s2_ms = int(s2_ms_part) + int(s2_min_part) * 60_000
-
-                    self._pit_status[i] = int(pit_status)
-                    self._result_status[i] = int(result_status)
-
-                    # update player live fields
-
-                    if i == self._player_idx:
-
-                        # lapDistance may be negative before crossing the line; keep it but it's fine
-
-                        if self.state.player_lap_distance_m != float(lap_dist_m):
-                            self.state.player_lap_distance_m = float(lap_dist_m)
-
-                            changed = True
-
-                        if self.state.player_current_lap_time_ms != int(cur_ms):
-                            self.state.player_current_lap_time_ms = int(cur_ms)
-
-                            changed = True
-
-                        if self.state.player_sector1_time_ms != s1_ms:
-                            self.state.player_sector1_time_ms = s1_ms
-
-                            changed = True
-
-                        if self.state.player_sector2_time_ms != s2_ms:
-                            self.state.player_sector2_time_ms = s2_ms
-
-                            changed = True
-
-                        if self.state.player_pit_status != int(pit_status):
-                            self.state.player_pit_status = int(pit_status)
-
-                            changed = True
-
-                        if self.state.player_current_lap_num != int(lap_num):
-                            self.state.player_current_lap_num = int(lap_num)
-
-                            changed = True
-
-                    # Last lap time handling (this is what you used for deltas/history)
-
-                    # ignore obvious garbage
-
-                    if last_ms and last_ms < 10_000_000:
-
-                        last_ms = int(last_ms)
-
-                    else:
-
-                        last_ms = None
-
-                    if last_ms is not None:
-
-                        prev_ms = self._last_lap_ms[i]
-
-                        if prev_ms != last_ms:
-
-                            self._last_lap_ms[i] = last_ms
-
-                            changed = True
-
-                            # your existing validity/outlap logic can remain,
-
-                            # but now it uses the real pit_status and real last lap time:
-
-                            valid = True
-
-                            lap_flag = "OK"
-
-                            # conservative "IN" detection: only if pit status says pitting AND lap is very slow
-
-                            if self._pit_status[i] != 0 and last_ms >= 200_000:
-                                valid = False
-
-                                lap_flag = "IN"
-
-                            # keep your outlap ignore mechanism if you want (only if you have _ignore_next_lap)
-
-                            if hasattr(self, "_ignore_next_lap") and self._ignore_next_lap[i]:
-
-                                looks_like_outlap = False
-
-                                if isinstance(prev_ms, int) and prev_ms > 0:
-
-                                    if (last_ms - prev_ms) >= getattr(self, "_outlap_slow_ms", 45_000):
-                                        looks_like_outlap = True
-
-                                if last_ms >= 200_000:
-                                    looks_like_outlap = True
-
-                                if looks_like_outlap:
-                                    valid = False
-
-                                    lap_flag = "OUT"
-
-                                self._ignore_next_lap[i] = False
-
-                            self._lap_valid[i] = valid
-
-                            self._lap_flag[i] = lap_flag
-
-                            # update player's last lap in state
-
-                            if i == self._player_idx:
-
-                                if self.state.player_last_lap_time_ms != last_ms:
-                                    self.state.player_last_lap_time_ms = last_ms
-
-                                    changed = True
-
-                            # keep your per-car history updates if they exist
-
-                            if hasattr(self, "_car_laps") and hasattr(self, "_tyre_cat"):
-
-                                cat = self._tyre_cat[i]
-
-                                if valid and cat in ("SLICK", "INTER", "WET"):
-
-                                    lap_s = last_ms / 1000.0
-
-                                    buf = self._car_laps[i][cat]
-
-                                    if self._robust_accept_lap(buf, lap_s):
-                                        buf.append(lap_s)
-
-                            # keep your "your laps" buffers if they exist
-
-                            if (
-
-                                    hasattr(self, "_your_laps")
-
-                                    and self._player_idx is not None
-
-                                    and i == self._player_idx
-
-                                    and hasattr(self, "_tyre_cat")
-
-                            ):
-
-                                cat = self._tyre_cat[i]
-
-                                if valid and cat in ("SLICK", "INTER", "WET"):
-
-                                    lap_s = last_ms / 1000.0
-
-                                    ybuf = self._your_laps[cat]
-
-                                    if self._robust_accept_lap(ybuf, lap_s):
-                                        ybuf.append(lap_s)
-
-                if changed:
-                    self._update_field_metrics_and_emit()
-
-
-            elif pid == 4:
-
-                # Participants packet (F1 25):
-
-                # header(29) + numActiveCars(1) + 22 * ParticipantData(57)
-
-                # ParticipantData (F1 25) layout:
-
-                # 0 aiControlled
-
-                # 1 driverId
-
-                # 2 networkId
-
-                # 3 teamId
-
-                # 4 myTeam
-
-                # 5 raceNumber
-
-                # 6 nationality
-
-                # 7..38 name[32]
-
-                # 39 yourTelemetry
-
-                # 40 showOnlineNames
-
-                # 41..42 techLevel (uint16)
-
-                # 43 platform
-
-                # 44 numColours
-
-                # 45..56 liveryColours[4] (4 * RGB)
-
-                try:
-
-                    base = int(hdr.get("headerSize", 29))
-
-                    # num_active = struct.unpack_from("<B", data, base)[0]  # optional
-
-                    psize = 57
-
-                    p0 = base + 1
-
-                    pidx = int(self._player_idx) if self._player_idx is not None else int(hdr.get("playerCarIndex", 0))
-
-                    if 0 <= pidx < 22 and (p0 + (pidx + 1) * psize) <= len(data):
-
-                        off = p0 + pidx * psize
-
-                        team_id = struct.unpack_from("<B", data, off + 3)[0]
-
-                        team_name = TEAM_ID_TO_NAME.get(int(team_id), f"TEAM{int(team_id)}")
-
-                        changed = False
-
-                        if int(team_id) != (self.state.player_team_id if self.state.player_team_id is not None else -1):
-                            self.state.player_team_id = int(team_id)
-
-                            changed = True
-
-                        if team_name != (self.state.player_team_name or ""):
-                            self.state.player_team_name = team_name
-
-                            changed = True
-
-                        # optional debug
-
-                        # if changed:
-
-                        #     print(f"[P4] player teamId={team_id} teamName={team_name}")
-
-
-                except Exception:
-
-                    pass
-
-
-
-            elif pid == 7:
-
-                base = int(hdr.get("headerSize", 29))
-
-                remaining = len(data) - base
-
-                pkt_fmt = int(hdr.get("packetFormat", 0))
-                car_size = 60 if pkt_fmt == 2020 else 55
-
-                if remaining < 22 * car_size:
-                    continue
-
-                #car_size = remaining // 22  # bei dir i.d.R. 55
-
-                changed = False
-
-                for i in range(22):
-
-                    off = base + i * car_size
-
-                    if off + car_size > len(data):
-                        break
-
-                    try:
-                        (
-                            _tc,
-                            _abs,
-                            _fuel_mix,
-                            _bbias,
-                            _pitlim,
-                            _fuel_in_tank,
-                            _fuel_cap,
-                            _fuel_rem_laps,
-                            _max_rpm,
-                            _idle_rpm,
-                            _max_gears,
-                            _drs_allowed,
-                            _drs_dist,
-                            actual,
-                            visual,
-                            _tyre_age,
-                            fia_flag,
-                        ) = struct.unpack_from("<BBBBBfffHHBBHBBBb", data, off)
-
-                        self._tyre_actual[i] = int(actual)
-                        self._tyre_visual[i] = int(visual)
-
-                        # Save player-specific FIA flag (blue/yellow/green/none)
-                        player_idx = int(hdr.get("playerCarIndex", 0))
-                        if i == player_idx:
-                            if self.state.player_fia_flag != int(fia_flag):
-                                self.state.player_fia_flag = int(fia_flag)
-                                changed = True
-
-                    except struct.error:
-                        continue
-
-                    if visual == 8:
-
-                        tyre_cat = "WET"
-
-                    elif visual == 7:
-
-                        tyre_cat = "INTER"
-
-                    else:
-
-                        tyre_cat = "SLICK"
-
-                    now = time.monotonic()
-                    self._tyre_last_seen[i] = now
-
-                    pit = self._pit_status[i]
-
-                    # Während Pit nur "merken" (damit du es nicht VOR dem Stopp siehst)
-                    if pit in (1, 2):
-                        self._pending_tyre[i] = tyre_cat
-                    else:
-                        # auf Strecke: normal aktualisieren (z.B. Start, SC, etc.)
-                        prev_cat = self._tyre_cat[i]
-                        if prev_cat != tyre_cat:
-                            self._tyre_cat[i] = tyre_cat
-                            changed = True
-
-                            # WICHTIG:
-                            # Reifenklasse wechselt oft VOR dem nächsten LapTime-Event.
-                            # Dann würde die letzte Slick-Zeit fälschlich als Inter/Wet gezählt werden.
-                            self._last_lap_ms[i] = None
-                            self._lap_valid[i] = False
-                            self._lap_flag[i] = "TYRE_SWAP"
-
-                            # Arm outlap-ignore ONLY if this looks like a real pit tyre change:
-                            if prev_cat is not None:
-                                self._pit_cycle[i] = 2
-                                self._ignore_next_lap[i] = True
-
-                            self._last_tyre_cat[i] = tyre_cat
-
-                # DEBUG: nach dem Verarbeiten aller 22 Autos einmal ausgeben (sonst spam)
-                interwet = []
-                for j in range(22):
-                    if self._tyre_cat[j] in ("INTER", "WET"):
-                        interwet.append(
-                            (j, self._tyre_cat[j], self._last_lap_ms[j], self._tyre_actual[j], self._tyre_visual[j]))
-                if self.debug:
-                    print("[TYRE DEBUG] inter/wet cars:", interwet)
-
-                if changed:
-                    self._dirty = True
-
-            self._maybe_emit()
-
         sock.close()
 
     def _update_field_metrics_and_emit(self):
@@ -2538,6 +1788,13 @@ class F1UDPReplayListener(F1UDPListener):
         Extracted minimal entrypoint: this reuses the exact logic already in the LIVE loop.
         We keep it as a small wrapper so replay doesn't have to duplicate the whole _run().
         """
+        # Replay counts as "packet received" for health panel too.
+        try:
+            with self._last_packet_lock:
+                self._last_packet_mono = time.monotonic()
+        except Exception:
+            pass
+
         # This is the same as the LIVE _run() body AFTER recvfrom().
         hdr = _read_header(data)
         if not hdr:

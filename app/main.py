@@ -64,6 +64,14 @@ class MainWindow(QtWidgets.QMainWindow):
         }
         self._refresh_health_panel()
 
+        # --- Data Health ticking (UDP packet age) ---
+        # UI timer: refresh UDP "age" a few times per second (cheap + smooth)
+        self._health_timer = QtCore.QTimer(self)
+        self._health_timer.setInterval(250)  # 4 Hz
+        self._health_timer.timeout.connect(self._on_health_tick)
+        self._health_timer.start()
+        # -------------------------------------------
+
         # Log bleibt im File aktiv, aber kein UI-Debugfenster mehr.
         # (ui_sink=None => nur app.log, kein QPlainTextEdit-Spam)
         self.logger = AppLogger(ui_sink=None)
@@ -376,6 +384,49 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
 
+    def _on_health_tick(self) -> None:
+        """
+        Periodic UI tick to update 'UDP packet age' in the health panel.
+        Must never crash the UI.
+        """
+        try:
+            h = getattr(self, "_health", None)
+            if not isinstance(h, dict):
+                return
+
+            udp_h = h.get("udp", {})
+            if not isinstance(udp_h, dict):
+                udp_h = {}
+                h["udp"] = udp_h
+
+            # Keep enabled/port in sync with current config
+            udp_h["enabled"] = bool(getattr(self.cfg, "udp_enabled", False))
+            udp_h["port"] = int(getattr(self.cfg, "udp_port", 0) or 0)
+
+            # If UDP service isn't running yet, show "—"
+            if not udp_h["enabled"] or self.udp is None:
+                udp_h["age_s"] = "—"
+                self._refresh_health_panel()
+                return
+
+            # Ask listener for seconds since last packet
+            age = None
+            try:
+                age = self.udp.get_last_packet_age_s()
+            except Exception:
+                age = None
+
+            if age is None:
+                udp_h["age_s"] = "—"
+            else:
+                # readable formatting
+                udp_h["age_s"] = f"{float(age):.2f}s"
+
+            self._refresh_health_panel()
+
+        except Exception:
+            pass
+
     def _apply_cfg_to_ui(self):
         # delegated to SettingsTabWidget (keeps behavior identical, just moved)
         self.settings_tab.apply_cfg_to_ui()
@@ -397,6 +448,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cfg.udp_port = int(self.spinPort.value())
         self.cfg.udp_write_csv_laps = self.chkUdpWriteLaps.isChecked()
         save_config(self.cfg)
+
+        # Keep Health panel in sync immediately (port/enabled)
+        try:
+            self._health["udp"]["enabled"] = bool(self.cfg.udp_enabled)
+            self._health["udp"]["port"] = int(self.cfg.udp_port)
+        except Exception:
+            pass
+        self._refresh_health_panel()
 
         self.status.showMessage("Settings saved. Restarting services…", 3000)
         self._restart_services()
