@@ -416,17 +416,16 @@ class MainWindow(QtWidgets.QMainWindow):
             # Keep enabled/port in sync with current config
             udp_h["enabled"] = bool(getattr(self.cfg, "udp_enabled", False))
             udp_h["port"] = int(getattr(self.cfg, "udp_port", 0) or 0)
+            udp_h["src"] = str(getattr(self.cfg, "udp_source", "LIVE") or "LIVE").strip().upper()
 
-            # If UDP service isn't running yet, show "—"
-            if not udp_h["enabled"] or self.udp is None:
-                udp_h["age_s"] = "—"
+            # If UDP service isn't running yet, show "—" (IMPORTANT: set the fields the panel actually renders)
+            if (not udp_h["enabled"]) or (self.udp is None):
+                udp_h["live_age_s"] = "—"
+                udp_h["replay_age_s"] = "—"
                 self._refresh_health_panel()
                 return
 
-            # Quelle merken (LIVE/REPLAY) – wird im Panel angezeigt
-            udp_h["src"] = str(getattr(self.cfg, "udp_source", "LIVE") or "LIVE").strip().upper()
-
-            # Get ages separately (LIVE vs REPLAY). Robust fallback, falls ältere Listener-Versionen laufen.
+            # Get ages separately (LIVE vs REPLAY). Robust fallback if older listener version is running.
             live_age = None
             replay_age = None
 
@@ -454,7 +453,6 @@ class MainWindow(QtWidgets.QMainWindow):
             udp_h["replay_age_s"] = "—" if replay_age is None else f"{float(replay_age):.2f}s"
 
             self._refresh_health_panel()
-
 
         except Exception:
             pass

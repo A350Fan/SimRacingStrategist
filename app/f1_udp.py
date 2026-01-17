@@ -383,6 +383,16 @@ class F1UDPListener:
         except Exception:
             return None
 
+    def get_last_packet_age_s(self) -> Optional[float]:
+        """
+        Legacy single-age API (compat):
+        Prefer LIVE age if available, else REPLAY age.
+        """
+        a = self.get_last_live_packet_age_s()
+        if a is not None:
+            return a
+        return self.get_last_replay_packet_age_s()
+
     def _handle_packet(self, pid, hdr, data: bytes) -> None:
 
         if pid == 1:
