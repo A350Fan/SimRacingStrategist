@@ -18,6 +18,14 @@ class DbTabWidget(QtWidgets.QWidget):
         self.btnRefreshDb = QtWidgets.QPushButton(self.tr.t("db.refresh", "Refresh"))
         self.btnRefreshDb.clicked.connect(on_refresh_clicked)
         db_bar.addWidget(self.btnRefreshDb)
+
+        # retention/debug tools (wired by MainWindow, so DbTab stays "dumb UI")
+        self.btnExportDb = QtWidgets.QPushButton(self.tr.t("db.export_csv", "Export DB (CSV)…"))
+        db_bar.addWidget(self.btnExportDb)
+
+        self.btnClearCache = QtWidgets.QPushButton(self.tr.t("db.clear_cache", "Clear cache…"))
+        db_bar.addWidget(self.btnClearCache)
+
         db_bar.addStretch(1)
 
         self.tbl = QtWidgets.QTableWidget()
@@ -45,3 +53,7 @@ class DbTabWidget(QtWidgets.QWidget):
 
     def retranslate(self):
         self.btnRefreshDb.setText(self.tr.t("db.refresh", "Refresh"))
+        if hasattr(self, "btnExportDb"):
+            self.btnExportDb.setText(self.tr.t("db.export_csv", "Export DB (CSV)…"))
+        if hasattr(self, "btnClearCache"):
+            self.btnClearCache.setText(self.tr.t("db.clear_cache", "Clear cache…"))

@@ -127,6 +127,83 @@ def latest_laps(limit: int = 50) -> List[Tuple]:
     )
     return cur.fetchall()
 
+def export_laps_to_csv(csv_path: str) -> int:
+    """
+    Export the whole laps table to a CSV file.
+    Returns number of exported rows.
+
+    Keep it simple & reliable:
+    - fixed column order
+    - UTF-8
+    - does NOT modify DB
+    """
+    import csv as _csv
+
+    con = connect()
+    cur = con.execute(
+        """
+        SELECT
+            created_at,
+            game,
+            track,
+            session,
+            session_uid,
+            weather,
+            tyre,
+            lap_time_s,
+            fuel_load,
+            wear_fl,
+            wear_fr,
+            wear_rl,
+            wear_rr,
+            source_file
+        FROM laps
+        ORDER BY id ASC
+        """
+    )
+    rows = cur.fetchall()
+
+    header = [
+        "created_at",
+        "game",
+        "track",
+        "session",
+        "session_uid",
+        "weather",
+        "tyre",
+        "lap_time_s",
+        "fuel_load",
+        "wear_fl",
+        "wear_fr",
+        "wear_rl",
+        "wear_rr",
+        "source_file",
+    ]
+
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        w = _csv.writer(f)
+        w.writerow(header)
+        w.writerows(rows)
+
+    return len(rows)
+
+
+def clear_laps_table() -> int:
+    """
+    Clears ALL rows from laps table. Returns deleted row count (best-effort).
+
+    NOTE: This is optional; you asked for 'clear cache' primarily.
+    I'm including it because it's often useful, but you can skip wiring it into UI.
+    """
+    con = connect()
+    # sqlite3 doesn't always give rowcount reliably; still useful as best-effort.
+    cur = con.execute("DELETE FROM laps;")
+    con.commit()
+    try:
+        return int(cur.rowcount or 0)
+    except Exception:
+        return 0
+
 def lap_counts_by_track() -> List[Tuple[str, int]]:
     con = connect()
     cur = con.execute(

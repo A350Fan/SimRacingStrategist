@@ -16,9 +16,10 @@ from app.ui.tabs.settings_tab import SettingsTabWidget
 from app.config import load_config, save_config, AppConfig
 from app.watcher import FolderWatcher
 from app.overtake_csv import parse_overtake_csv, lap_summary
-from app.db import upsert_lap, latest_laps, distinct_tracks, laps_for_track
+from app.db import upsert_lap, latest_laps, distinct_tracks, laps_for_track, export_laps_to_csv
 from app.f1_udp import F1UDPListener, F1UDPReplayListener, F1LiveState
 from app.logging_util import AppLogger
+from app.paths import cache_dir
 from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop
 from app.rain_engine import RainEngine
 from app.translator import Translator
@@ -28,6 +29,7 @@ from app.minisectors import MiniSectorTracker
 import sys
 import re
 import csv
+import shutil
 
 
 _RE_RACE = re.compile(r"(^|_)r($|_)")
@@ -53,6 +55,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._dedupe_mtime = {}  # src_path -> last_mtime_ns
 
         self._build_ui()
+        self._build_tools_menu()
         self._retranslate_ui()
 
         # --- Data Health (MVP) ---
@@ -293,6 +296,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btnRefreshDb = self.db_tab.btnRefreshDb
         self.tbl = self.db_tab.tbl
 
+        # wire DB tab tool buttons to the same handlers as the Tools menu
+        self.btnExportDb = self.db_tab.btnExportDb
+        self.btnClearCache = self.db_tab.btnClearCache
+
+        self.btnExportDb.clicked.connect(self._on_export_db_csv)
+        self.btnClearCache.clicked.connect(self._on_clear_cache)
+
         # =========================
         # TAB 3: MODEL
         # =========================
@@ -340,6 +350,114 @@ class MainWindow(QtWidgets.QMainWindow):
         # Status bar (kept)
         self.status = QtWidgets.QStatusBar()
         self.setStatusBar(self.status)
+
+    def _build_tools_menu(self) -> None:
+        """
+        Small retention/debug menu:
+        - Export DB to CSV
+        - Clear cache folder
+
+        Important: This must NOT touch user output folder (udp_output_root).
+        Only app cache_dir() is cleared.
+        """
+        menubar = self.menuBar()
+        m_tools = menubar.addMenu(self.tr.t("menu.tools", "Tools"))
+
+        act_export = QtGui.QAction(self.tr.t("menu.export_db_csv", "Export DB (CSV)…"), self)
+        act_export.triggered.connect(self._on_export_db_csv)
+        m_tools.addAction(act_export)
+
+        act_clear_cache = QtGui.QAction(self.tr.t("menu.clear_cache", "Clear cache…"), self)
+        act_clear_cache.triggered.connect(self._on_clear_cache)
+        m_tools.addAction(act_clear_cache)
+
+        # keep refs if you later want to retranslate action texts dynamically
+        self._act_export_db = act_export
+        self._act_clear_cache = act_clear_cache
+
+
+    @QtCore.Slot()
+    def _on_export_db_csv(self) -> None:
+        """
+        Ask where to save, then export laps table to CSV.
+        """
+        try:
+            fn, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self,
+                self.tr.t("dlg.export_db_title", "Export DB to CSV"),
+                "laps_export.csv",
+                "CSV (*.csv)"
+            )
+            if not fn:
+                return
+
+            n = export_laps_to_csv(fn)
+            self.status.showMessage(
+                self.tr.t("msg.export_ok", "Exported DB to CSV.") + f" rows={n}",
+                5000
+            )
+        except Exception as e:
+            # Mark DB health as FAIL because this is DB-related debugging
+            self._mark_db_fail(e)
+            try:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    self.tr.t("msg.error", "Error"),
+                    f"DB export failed: {type(e).__name__}: {e}"
+                )
+            except Exception:
+                pass
+
+
+    @QtCore.Slot()
+    def _on_clear_cache(self) -> None:
+        """
+        Clears ONLY the internal cache directory used by watcher.copy_to_cache().
+        Safe: doesn't touch telemetry_root or udp_output_root.
+        """
+        try:
+            p = cache_dir()
+            p.mkdir(parents=True, exist_ok=True)
+
+            # confirm (avoid accidental deletion)
+            reply = QtWidgets.QMessageBox.question(
+                self,
+                self.tr.t("dlg.clear_cache_title", "Clear cache"),
+                self.tr.t(
+                    "dlg.clear_cache_text",
+                    f"Delete all cached files in:\n{str(p)}\n\nThis does NOT delete your telemetry folders.\nProceed?"
+                ),
+                QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+            )
+            if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+                return
+
+            deleted = 0
+            for child in p.iterdir():
+                try:
+                    if child.is_file() or child.is_symlink():
+                        child.unlink(missing_ok=True)
+                        deleted += 1
+                    elif child.is_dir():
+                        shutil.rmtree(child, ignore_errors=True)
+                        deleted += 1
+                except Exception:
+                    pass
+
+            self.status.showMessage(
+                self.tr.t("msg.cache_cleared", "Cache cleared.") + f" deleted={deleted}",
+                5000
+            )
+        except Exception as e:
+            try:
+                QtWidgets.QMessageBox.warning(
+                    self,
+                    self.tr.t("msg.error", "Error"),
+                    f"Clear cache failed: {type(e).__name__}: {e}"
+                )
+            except Exception:
+                pass
+
 
     def _health_now_str(self) -> str:
         """Human-readable timestamp for the health panel (local time)."""
