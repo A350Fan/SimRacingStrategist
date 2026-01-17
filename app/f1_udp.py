@@ -1785,8 +1785,7 @@ class F1UDPReplayListener(F1UDPListener):
             self._dbg(f"[REPLAY] File not found: {self.replay_file}", throttle_s=5.0)
             return
 
-        if self.debug:
-            print(f"[REPLAY] Playing: {self.replay_file} @ speed={self.speed}x")
+        self._dbg(f"[REPLAY] Playing: {self.replay_file} @ speed={self.speed}x", throttle_s=5.0)
 
         try:
             with p.open("rb") as f:
