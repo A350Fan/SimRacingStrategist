@@ -1355,10 +1355,8 @@ class F1UDPListener:
 
                 # ---------------------------------------------------------------
 
-                # DEBUG: zeigen ob überhaupt UDP ankommt
-                if self.debug:
-                    print("RX", len(data))
-
+                # DEBUG: zeigen ob überhaupt UDP ankommt (throttled -> no console spam)
+                self._dbg("RX", len(data), throttle_s=1.0)
 
             except socket.timeout:
                 continue
