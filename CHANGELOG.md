@@ -9,13 +9,22 @@ Semantic Versioning (in an early 0.x stage).
 ## [Unreleased]
 
 ### Added
-- None
+- 
 
 ### Changed
 - None
 
 ### Fixed
 - None
+
+---
+## [0.3.2] - 2025-01-17
+
+### Added
+- pause of lap timer when pausing game
+
+### Fixed
+- delta is now calculated as intended
 
 ---
 ## [0.3.2] - 2025-01-17
