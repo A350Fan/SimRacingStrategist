@@ -1,0 +1,57 @@
+├───app
+│   ├───.idea
+│   │   └───inspectionProfiles
+│   │
+│   ├───logic
+│   │   └───rain_engine
+│   │
+│   ├───telemetry
+│   │   └───packets
+│   │
+│   ├───ui
+│   │   ├───tabs
+│   │   │   ├───db_tab.py
+│   │   │   ├───live_raw_tab.py
+│   │   │   ├───live_tab.py
+│   │   │   ├───model_tab.py
+│   │   │   └───settings_tab.py
+│   │   │
+│   │   └───widgets
+│   │       ├───ascii_hud_widget.py
+│   │       ├───flag_widget.py
+│   │       ├───lap_timer_widget.py
+│   │       ├───live_header_widget.py
+│   │       ├───minisector_widget.py
+│   │       └───strategy_cards_widget.py
+│   │
+│   ├───__pycache__
+│   │
+│   ├───config.py
+│   ├───db.py
+│   ├───f1_udp.py
+│   ├───game_profiles.py
+│   ├───logging_util.py
+│   ├───main.py
+│   ├───minisectors.py
+│   ├───overtake_csv.py
+│   ├───paths.py
+│   ├───rain_engine.py
+│   ├───strategy.py
+│   ├───strategy_model.py
+│   ├───track_map.py
+│   ├───translator.py
+│   └───watcher.py
+│
+├───docs
+│   ├───how to use
+│   │   └───debugging
+│   └───screenshots
+│
+└───lang
+    ├───de.json
+    ├───en.json
+    ├───es.json
+    ├───fr.json
+    ├───it.json
+    ├───lk.json
+    └───pt.json
