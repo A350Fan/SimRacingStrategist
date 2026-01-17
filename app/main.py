@@ -348,6 +348,31 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             return "—"
 
+    # -------------------- Data Health helpers --------------------
+    def _mark_db_ok(self) -> None:
+        """Mark DB health as OK with timestamp."""
+        try:
+            self._health["db"]["status"] = "OK"
+            self._health["db"]["ts"] = self._health_now_str()
+            self._health["db"]["err"] = ""
+            self._refresh_health_panel()
+        except Exception:
+            pass
+
+    def _mark_db_fail(self, err: Exception | str) -> None:
+        """Mark DB health as FAIL with a short reason."""
+        try:
+            reason = err if isinstance(err, str) else f"{type(err).__name__}: {err}"
+            if len(reason) > 140:
+                reason = reason[:137] + "..."
+            self._health["db"]["status"] = "FAIL"
+            self._health["db"]["ts"] = self._health_now_str()
+            self._health["db"]["err"] = reason
+            self._refresh_health_panel()
+        except Exception:
+            pass
+    # -------------------------------------------------------------
+
     def _refresh_health_panel(self) -> None:
         """
         Render the current health dict into the 3 labels.
@@ -1707,6 +1732,8 @@ class MainWindow(QtWidgets.QMainWindow):
             summ["session_uid"] = str(sess_uid)
 
             upsert_lap(str(src), summ)
+            self._mark_db_ok()
+
 
             self.logger.info(
                 f"Imported: track={summ.get('track')} tyre={summ.get('tyre')} "
@@ -1754,12 +1781,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def _after_db_update(self):
-        # Health: DB write OK (we mark whenever a CSV import triggers a DB refresh)
+        # Health: DB refresh happened (NOTE: real DB write OK/FAIL is marked at the write site)
+        # Keep this as a lightweight "we refreshed views" hint, but do not overwrite FAIL.
         try:
-            self._health["db"]["status"] = "OK"
-            self._health["db"]["ts"] = self._health_now_str()
-            self._health["db"]["err"] = ""
-            self._refresh_health_panel()
+            if self._health.get("db", {}).get("status") != "FAIL":
+                self._mark_db_ok()
         except Exception:
             pass
 
@@ -2060,13 +2086,30 @@ class MainWindow(QtWidgets.QMainWindow):
             }
 
             upsert_lap(str(src), summ)
+            self._mark_db_ok()
             return True
         except Exception as e:
-            # still "recognized", so return True to avoid trying to parse as Iko CSV
+            # still "recognized", so return True to avoid trying to parse as Iko CSV,
+            # BUT: mark health properly so you see the failure.
             try:
                 self.logger.error(f"OWN UDP CSV import failed for {src.name}: {type(e).__name__}: {e}")
             except Exception:
                 pass
+
+            # CSV is still "recognized format", but the import failed.
+            try:
+                self._health["csv"]["status"] = "FAIL"
+                self._health["csv"]["last_file"] = src.name
+                self._health["csv"]["ts"] = self._health_now_str()
+                msg = f"OWN-UDP: {type(e).__name__}: {e}"
+                if len(msg) > 140:
+                    msg = msg[:137] + "..."
+                self._health["csv"]["err"] = msg
+                self._refresh_health_panel()
+            except Exception:
+                pass
+
+            self._mark_db_fail(e)
             return True
 
 
