@@ -18,6 +18,14 @@ Semantic Versioning (in an early 0.x stage).
 - None
 
 ---
+## [0.3.2] - 2025-01-17
+
+### Added
+- health bar for easier bug fixing
+- option to export CSV data
+- cache clear button
+
+---
 ## [0.3.1] - 2025-01-17
 
 ### Changed
