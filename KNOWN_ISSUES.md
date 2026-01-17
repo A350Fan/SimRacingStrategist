@@ -7,7 +7,7 @@ This document lists known problems, limitations, and workarounds of the project.
 ## 🟥 Critical Issues
 
 ### KI-001 – Minisector tracking unstable
-**Affected version(s):** v0.1.0 - v0.2.0   
+**Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** MiniSectorTracker  
 
 **Description:**  
@@ -29,7 +29,7 @@ Additional safeguards using a lap UID or distance–time consistency checks.
 ## 🟧 Medium Issues
 
 ### KI-002 – Minisector timing may deviate by up to ±16.67 ms
-**Affected version(s):** v0.1.0 - v0.2.0   
+**Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** MiniSectorTracker  
 
 **Description:**  
@@ -44,7 +44,7 @@ As a result, minisector times and theoretical lap times may partially deviate fr
 A solution for more accurate minisector timing is still under investigation.
 
 ### KI-003 – Minisector fallback in F1 2020 is only approximate
-**Affected version(s):** v0.1.0 - v0.2.0   
+**Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** MiniSectorTracker  
 
 **Description:**  
@@ -66,7 +66,7 @@ Optional manual track profiles with real sector distances.
 ---
 
 ### KI-004 – F1 2020: Minisector times are cleared on every new lap
-**Affected version(s):** v0.1.0 - v0.2.0   
+**Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** MiniSectorTracker, F1 2020 fallback logic  
 
 **Description:**  
@@ -91,7 +91,7 @@ The current logic treats each lap as an isolated unit.
 ---
 
 ### KI-005 – Rain forecast occasionally reported as `n/a`
-**Affected version(s):** v0.1.0 - v0.2.0   
+**Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** RainEngine, f1_udp  
 
 **Description:**  
@@ -114,7 +114,7 @@ Forecast pre-buffering using a minimum number of samples.
 ## 🟨 Low Issues
 
 ### KI-006 – Strategy Cards are currently placeholders
-**Affected version(s):** v0.1.0 - v0.2.0   
+**Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** UI  
 
 **Description:**  
@@ -132,11 +132,11 @@ Connect to real strategy outputs.
 ---
 
 ### KI-007 – lap timing is not done yet
-**Affected version(s):** v0.1.0 - v0.2.1   
+**Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** UI  
 
 **Description:**  
-- some data could be strange (delta is wrong)
+- some data could be strange
 - tyre sets are shown wrongly
 - speed etc. have no data
 
@@ -151,7 +151,7 @@ Connect to real strategy outputs.
 ## 🧪 Experimental / Design-related Limitations
 
 ### KI-008 – Field deltas not always available
-**Affected version(s):** v0.1.0 - v0.2.0   
+**Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** RainEngine  
 
 **Description:**  
@@ -167,7 +167,7 @@ By design – sufficient sample size is required.
 ---
 
 ### KI-009 – Tyre wear learning requires sufficient data
-**Affected version(s):** v0.1.0 - v0.2.0  
+**Affected version(s):** v0.1.0 - v0.3.1  
 **Affected modules:** Degradation Model  
 
 **Description:**  

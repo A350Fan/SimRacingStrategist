@@ -9,6 +9,27 @@ Semantic Versioning (in an early 0.x stage).
 ## [Unreleased]
 
 ### Added
+- None
+
+### Changed
+- None
+
+### Fixed
+- None
+
+---
+## [0.3.1] - 2025-01-17
+
+### Changed
+- current minisectors are now shown as a grey bar
+
+### Fixed
+- fixed delta not being shown as intended
+
+---
+## [0.3.0] - 2025-01-16
+
+### Added
 - begin of building intuitive UI
   - added flag widget
   - added lap timing data widget
@@ -19,9 +40,6 @@ Semantic Versioning (in an early 0.x stage).
 
 ### Changed
 - outsourcing of elements for smaller files
-
-### Fixed
-- None
 
 ---
 ## [0.2.1] - 2026-01-16
