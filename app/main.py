@@ -21,7 +21,7 @@ from app.f1_udp import F1UDPListener, F1UDPReplayListener, F1LiveState
 from app.logging_util import AppLogger
 from app.paths import cache_dir
 from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop
-from app.strategy import generate_strategy_cards
+from app.strategy import generate_strategy_cards, TeamContext
 from app.rain_engine import RainEngine
 from app.translator import Translator
 from app.track_map import track_label_from_id
@@ -1512,6 +1512,21 @@ class MainWindow(QtWidgets.QMainWindow):
                     session_label = self._session_label_from_udp(getattr(state, "session_type_id", None))
                 except Exception:
                     session_label = ""
+
+                track = track_label_from_id(state.track_id)
+
+                # TODO: später sauber aus UDP ableiten
+                gap_ahead = getattr(state, "gap_ahead_s", None)
+                gap_behind = getattr(state, "gap_behind_s", None)
+
+                pit_loss = 22.0  # placeholder, track-specific later
+
+                team_ctx = TeamContext(
+                    track=track,
+                    gap_ahead_s=gap_ahead,
+                    gap_behind_s=gap_behind,
+                    pit_loss_s=pit_loss,
+                )
 
                 rec2, cards2 = generate_strategy_cards(
                     track=track or "",

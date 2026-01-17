@@ -32,6 +32,31 @@ class StrategyRecommendation:
     confidence: float = 0.5
     reasoning: str = ""
 
+@dataclass
+class TeamContext:
+    """
+    Describes the strategic situation of the player relative to the field.
+    This is PURE logic data – no UI, no decisions yet.
+    """
+    track: str
+
+    # gaps in seconds
+    gap_ahead_s: Optional[float]
+    gap_behind_s: Optional[float]
+
+    pit_loss_s: float
+    safety_margin_s: float = 1.2  # conservative default
+
+    def has_free_pit_stop(self) -> bool:
+        """
+        Free pit stop = we can pit and rejoin without losing position
+        to the car behind.
+        """
+        if self.gap_behind_s is None:
+            return False
+
+        required_gap = self.pit_loss_s + self.safety_margin_s
+        return self.gap_behind_s > required_gap
 
 # =============================
 # Small helpers (track-scoped)
@@ -95,7 +120,6 @@ def _pit_loss_effective(base_pit_loss_s: float, sc_status: Optional[int]) -> flo
     if sc == 2:
         return float(base_pit_loss_s) * 0.80
     return float(base_pit_loss_s)
-
 
 # =============================
 # Strategy core (MVP v1)
