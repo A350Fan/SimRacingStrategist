@@ -1569,8 +1569,7 @@ class F1UDPListener:
         except Exception:
             pass
 
-        if self.debug:
-            print("[DELTA DEBUG] percar_deltas", len(deltas), "field_delta", self.state.pace_delta_inter_vs_slick_s)
+        self._dbg("[DELTA DEBUG] percar_deltas", len(deltas), "field_delta", self.state.pace_delta_inter_vs_slick_s)
 
     def _maybe_emit(self):
         if not getattr(self, "_dirty", False):
