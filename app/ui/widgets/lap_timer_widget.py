@@ -57,6 +57,11 @@ class LapTimerWidget(QtWidgets.QWidget):
         self._last_dist_m = None
         self._track_len_m = None
 
+        # We store the last *normalized* lap distance we got from telemetry,
+        # so the top-right Δ vs PB label can compute "delta at same point".
+        # (UI tick runs independently, so it needs a cached distance.)
+        self._last_live_norm_dist_m: float | None = None
+
         # -------------------------------------------------
         # distance->time traces for "delta at same point"
         # -------------------------------------------------
@@ -152,6 +157,7 @@ class LapTimerWidget(QtWidgets.QWidget):
         self._last_lap_num = None
         self._last_dist_m = None
         self._track_len_m = None
+        self._last_live_norm_dist_m = None
         self._freeze_until_t = 0.0
         self._frozen_ms = None
         self._frozen_delta_text = None
@@ -235,6 +241,10 @@ class LapTimerWidget(QtWidgets.QWidget):
             if cur_ms is not None and d is not None:
                 nd = self._norm_dist(d)
                 if nd is not None:
+                    # cache distance for the UI tick -> top delta label
+                    self._last_live_norm_dist_m = float(nd)
+
+                    # and still record into the trace
                     self._trace_add_point(nd, int(cur_ms))
         except Exception:
             pass
@@ -506,11 +516,37 @@ class LapTimerWidget(QtWidgets.QWidget):
             self._update_delta_label(current_ms=ms)
 
     def _update_delta_label(self, current_ms: int | None) -> None:
-        if self._pb_ms is None or current_ms is None:
+        """
+        Top-right Δ vs PB label should be the SAME logic as the live delta bar:
+        compare against PB at the exact same point on track (distance->time trace).
+
+        Fallbacks:
+          - If we don't have a PB trace yet -> use full-lap PB (old behavior).
+          - If we don't know current distance -> also fallback.
+        """
+        if current_ms is None:
             self.lblDelta.setText("Δ vs PB: —")
             return
 
-        # Delta in seconds with sign (PB is best, so negative means faster than PB at that moment)
-        delta_ms = current_ms - self._pb_ms
+        # Need at least some PB reference
+        if self._pb_ms is None:
+            self.lblDelta.setText("Δ vs PB: —")
+            return
+
+        delta_ms: int | None = None
+
+        # Preferred: "same point" delta using PB trace interpolation
+        try:
+            if self._last_live_norm_dist_m is not None:
+                pb_at_d = self._interp_pb_ms_at_dist(self._last_live_norm_dist_m)
+                if pb_at_d is not None:
+                    delta_ms = int(current_ms) - int(pb_at_d)
+        except Exception:
+            delta_ms = None
+
+        # Fallback: old "gap to full PB lap time"
+        if delta_ms is None:
+            delta_ms = int(current_ms) - int(self._pb_ms)
+
         sign = "+" if delta_ms >= 0 else "-"
-        self.lblDelta.setText(f"Δ vs PB: {sign}{abs(delta_ms)/1000.0:.3f}")
+        self.lblDelta.setText(f"Δ vs PB: {sign}{abs(delta_ms) / 1000.0:.3f}")
