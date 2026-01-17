@@ -1,10 +1,11 @@
+# app/minisectors.py
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, List, Tuple
 
+
 MINIS_PER_SECTOR = 10
 TOTAL_MINIS = 3 * MINIS_PER_SECTOR
-
 
 def _clamp(x: float, a: float, b: float) -> float:
     return a if x < a else b if x > b else x

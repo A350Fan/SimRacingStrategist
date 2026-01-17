@@ -1,6 +1,9 @@
+# app/strategy.py
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Optional, List
+
 
 # WIP/PROTOTYPE: Data model for the Strategy Cards UI.
 # This is already used by the UI, but the *contents* are currently static demo data.

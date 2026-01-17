@@ -1,4 +1,6 @@
+# app/game_profiles.py
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class GameProfile:

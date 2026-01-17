@@ -1,3 +1,4 @@
+# app/ui/widgets/live_header_widget.py
 from __future__ import annotations
 from PySide6 import QtWidgets
 

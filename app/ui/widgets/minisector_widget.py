@@ -1,3 +1,4 @@
+# app/ui/widgets/minisector_widget.py
 from __future__ import annotations
 from PySide6 import QtWidgets
 

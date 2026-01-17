@@ -1,3 +1,4 @@
+# app/ui/widgets/strategy_cards_widget.py
 from __future__ import annotations
 from PySide6 import QtWidgets
 

@@ -1,7 +1,9 @@
-
+# app/paths.py
 from __future__ import annotations
+
 import os
 from pathlib import Path
+
 
 def app_dir() -> Path:
     # Windows: %LOCALAPPDATA%\SimRaceStrategist

@@ -1,7 +1,10 @@
+#app/db.py
 from __future__ import annotations
+
 import sqlite3
 from typing import Dict, Any, List, Tuple
 from .paths import db_path
+
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS laps (

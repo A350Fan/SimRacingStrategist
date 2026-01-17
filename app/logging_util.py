@@ -1,3 +1,4 @@
+# app/logging_util.py
 from __future__ import annotations
 
 import datetime
@@ -5,6 +6,7 @@ import logging
 from pathlib import Path
 from typing import Callable, Optional
 from .paths import app_dir
+
 
 logger = logging.getLogger(__name__)
 

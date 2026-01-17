@@ -4,8 +4,6 @@ from __future__ import annotations
 from PySide6 import QtCore, QtWidgets, QtGui
 
 from app.ui.widgets.flag_widget import FlagWidget
-from app.ui.widgets.lap_timer_widget import LapTimerWidget
-from app.ui.widgets.minisector_widget import MiniSectorWidget
 from app.ui.widgets.ascii_hud_widget import AsciiHudWidget
 
 
