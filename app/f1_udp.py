@@ -1853,7 +1853,7 @@ class F1UDPReplayListener(F1UDPListener):
         if not hasattr(self, "_game_profile") or self._game_profile is None:
             self._game_profile = self._resolve_game_profile(hdr)
             if self.debug and self._game_profile:
-                print(
+                self._dbg(
                     f"[GAME] Using profile: {self._game_profile.name} "
                     f"(packetFormat={hdr.get('packetFormat')})"
                 )
