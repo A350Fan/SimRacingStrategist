@@ -29,8 +29,8 @@ Legend:
 
 ### Minisectors (F1 25)
 - ✅ Stabilize lap start detection (MS01 edge cases)
-- ⏳ Add a minisector debug dump (per lap snapshot) to log
-- ⏳ Add a per-track minisector sanity checker:
+- ✅ Add a minisector debug dump (per lap snapshot) to log
+- 🚧 Add a per-track minisector sanity checker:
   - missing indices
   - unusual splits (too small/too large)
 
@@ -43,6 +43,7 @@ Legend:
   - wetness score
   - confidence
   - reasons (signals used)
+  - fix PIT STOP recommendation bug
 - ⏳ Add safeguards for early-session low-sample situations
   (confidence gating / “collecting data” state)
 

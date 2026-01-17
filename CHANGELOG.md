@@ -9,7 +9,8 @@ Semantic Versioning (in an early 0.x stage).
 ## [Unreleased]
 
 ### Added
-- 
+- minisector debug dump
+- missing indices snapshot
 
 ### Changed
 - None
@@ -18,7 +19,7 @@ Semantic Versioning (in an early 0.x stage).
 - None
 
 ---
-## [0.3.2] - 2025-01-17
+## [0.3.3] - 2025-01-17
 
 ### Added
 - pause of lap timer when pausing game
