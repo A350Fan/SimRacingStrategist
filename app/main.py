@@ -59,7 +59,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # Store last known states for CSV / UDP / DB.
         self._health = {
             "csv": {"status": "—", "last_file": "—", "ts": "—", "err": ""},
-            "udp": {"enabled": bool(self.cfg.udp_enabled), "port": int(self.cfg.udp_port), "age_s": "—"},
+            "udp": {
+                "enabled": bool(self.cfg.udp_enabled),
+                "port": int(self.cfg.udp_port),
+                "src": str(getattr(self.cfg, "udp_source", "LIVE") or "LIVE").strip().upper(),
+                "live_age_s": "—",
+                "replay_age_s": "—",
+            },
             "db": {"status": "—", "ts": "—", "err": ""},
         }
         self._refresh_health_panel()
@@ -365,8 +371,16 @@ class MainWindow(QtWidgets.QMainWindow):
             # UDP (packet age comes in next step)
             udp_enabled = udp_h.get("enabled", False)
             udp_port = udp_h.get("port", "—")
-            udp_age = udp_h.get("age_s", "—")
-            self.lblHealthUdp.setText(f"UDP: {'ON' if udp_enabled else 'OFF'} | port {udp_port} | age {udp_age}")
+            udp_src = udp_h.get("src", "LIVE")
+
+            live_age = udp_h.get("live_age_s", "—")
+            replay_age = udp_h.get("replay_age_s", "—")
+
+            # getrennt labeln: LIVE vs REPLAY
+            self.lblHealthUdp.setText(
+                f"UDP: {'ON' if udp_enabled else 'OFF'} | src {udp_src} | port {udp_port} | "
+                f"LIVE age {live_age} | REPLAY age {replay_age}"
+            )
 
             # DB
             db_status = db_h.get("status", "—")
@@ -409,20 +423,38 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._refresh_health_panel()
                 return
 
-            # Ask listener for seconds since last packet
-            age = None
-            try:
-                age = self.udp.get_last_packet_age_s()
-            except Exception:
-                age = None
+            # Quelle merken (LIVE/REPLAY) – wird im Panel angezeigt
+            udp_h["src"] = str(getattr(self.cfg, "udp_source", "LIVE") or "LIVE").strip().upper()
 
-            if age is None:
-                udp_h["age_s"] = "—"
-            else:
-                # readable formatting
-                udp_h["age_s"] = f"{float(age):.2f}s"
+            # Get ages separately (LIVE vs REPLAY). Robust fallback, falls ältere Listener-Versionen laufen.
+            live_age = None
+            replay_age = None
+
+            try:
+                if hasattr(self.udp, "get_last_live_packet_age_s"):
+                    live_age = self.udp.get_last_live_packet_age_s()
+            except Exception:
+                live_age = None
+
+            try:
+                if hasattr(self.udp, "get_last_replay_packet_age_s"):
+                    replay_age = self.udp.get_last_replay_packet_age_s()
+            except Exception:
+                replay_age = None
+
+            # Optional fallback: very old API (single age)
+            if live_age is None and replay_age is None:
+                try:
+                    if hasattr(self.udp, "get_last_packet_age_s"):
+                        live_age = self.udp.get_last_packet_age_s()
+                except Exception:
+                    live_age = None
+
+            udp_h["live_age_s"] = "—" if live_age is None else f"{float(live_age):.2f}s"
+            udp_h["replay_age_s"] = "—" if replay_age is None else f"{float(replay_age):.2f}s"
 
             self._refresh_health_panel()
+
 
         except Exception:
             pass
@@ -453,8 +485,10 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             self._health["udp"]["enabled"] = bool(self.cfg.udp_enabled)
             self._health["udp"]["port"] = int(self.cfg.udp_port)
+            self._health["udp"]["src"] = str(getattr(self.cfg, "udp_source", "LIVE") or "LIVE").strip().upper()
         except Exception:
             pass
+
         self._refresh_health_panel()
 
         self.status.showMessage("Settings saved. Restarting services…", 3000)

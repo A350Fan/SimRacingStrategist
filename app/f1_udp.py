@@ -220,11 +220,12 @@ class F1UDPListener:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
-        # --- Data Health: UDP "last packet age" ---
-        # UDP thread updates this; UI thread reads it -> protect with a lock.
-        self._last_packet_lock = threading.Lock()
-        self._last_packet_mono: Optional[float] = None  # time.monotonic() timestamp of last received packet
-        # -----------------------------------------
+        # --- Data Health: last packet age (LIVE vs REPLAY getrennt) ---
+        # LIVE UDP thread + Replay thread update these; UI reads them -> lock.
+        self._pkt_lock = threading.Lock()
+        self._last_live_packet_mono: Optional[float] = None
+        self._last_replay_packet_mono: Optional[float] = None
+        # -------------------------------------------------------------
 
         self._deb_sc = _Debounce(n=6, max_age_s=0.7)
         self._deb_weather = _Debounce(n=6, max_age_s=0.7)
@@ -360,15 +361,22 @@ class F1UDPListener:
     # -----------------------------
     # Data Health public API
     # -----------------------------
-    def get_last_packet_age_s(self) -> Optional[float]:
-        """
-        Returns seconds since the last UDP packet was received.
-        None means: we haven't received anything yet (or UDP is stopped).
-        Safe to call from the UI thread.
-        """
+    def get_last_live_packet_age_s(self) -> Optional[float]:
+        """Seconds since last LIVE UDP packet. None = never received."""
         try:
-            with self._last_packet_lock:
-                t0 = self._last_packet_mono
+            with self._pkt_lock:
+                t0 = self._last_live_packet_mono
+            if t0 is None:
+                return None
+            return max(0.0, time.monotonic() - float(t0))
+        except Exception:
+            return None
+
+    def get_last_replay_packet_age_s(self) -> Optional[float]:
+        """Seconds since last REPLAY payload processed. None = never processed."""
+        try:
+            with self._pkt_lock:
+                t0 = self._last_replay_packet_mono
             if t0 is None:
                 return None
             return max(0.0, time.monotonic() - float(t0))
@@ -1280,13 +1288,13 @@ class F1UDPListener:
             try:
                 data, _addr = sock.recvfrom(2048)
 
-                # --- Data Health: remember last packet time (thread-safe) ---
+                # --- Data Health: LIVE packet received ---
                 try:
-                    with self._last_packet_lock:
-                        self._last_packet_mono = time.monotonic()
+                    with self._pkt_lock:
+                        self._last_live_packet_mono = time.monotonic()
                 except Exception:
                     pass
-                # -----------------------------------------------------------
+                # ---------------------------------------
 
                 # --- write raw packet to dump file (t_rel_ms + len + payload) ---
                 try:
@@ -1788,10 +1796,10 @@ class F1UDPReplayListener(F1UDPListener):
         Extracted minimal entrypoint: this reuses the exact logic already in the LIVE loop.
         We keep it as a small wrapper so replay doesn't have to duplicate the whole _run().
         """
-        # Replay counts as "packet received" for health panel too.
+        # Data Health: REPLAY payload processed (getrennt von LIVE!)
         try:
-            with self._last_packet_lock:
-                self._last_packet_mono = time.monotonic()
+            with self._pkt_lock:
+                self._last_replay_packet_mono = time.monotonic()
         except Exception:
             pass
 
