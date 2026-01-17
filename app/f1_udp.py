@@ -547,9 +547,13 @@ class F1UDPListener:
             # --- Session packet fields (F1 25 spec) ---
             weather_raw = data[base + 0]  # 0..5
 
-            if self.debug:
-                print("[SESSION] weather_raw", weather_raw, "trackTemp",
-                      int.from_bytes(data[base + 1:base + 2], "little", signed=True))
+            self._dbg(
+                "[SESSION] weather_raw",
+                weather_raw,
+                "trackTemp",
+                int.from_bytes(data[base + 1:base + 2], "little", signed=True),
+                throttle_s=2.0,
+            )
 
             safety_car_off = base + 19 + (21 * 5)
             if safety_car_off + 3 >= len(data):
