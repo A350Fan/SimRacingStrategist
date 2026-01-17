@@ -430,8 +430,7 @@ class F1UDPListener:
     def _handle_packet(self, pid, hdr, data: bytes) -> None:
 
         if pid == 1:
-            if self.debug:
-                print("[PID1] Session packet received len=", len(data))
+            self._dbg("[PID1] Session packet received len=", len(data))
 
             # basic size sanity check
             if len(data) < 150:
