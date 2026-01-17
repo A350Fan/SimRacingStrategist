@@ -1233,8 +1233,7 @@ class F1UDPListener:
                 if self._tyre_cat[j] in ("INTER", "WET"):
                     interwet.append(
                         (j, self._tyre_cat[j], self._last_lap_ms[j], self._tyre_actual[j], self._tyre_visual[j]))
-            if self.debug:
-                print("[TYRE DEBUG] inter/wet cars:", interwet)
+            self._dbg("[TYRE DEBUG] inter/wet cars:", interwet)
 
             if changed:
                 self._dirty = True
