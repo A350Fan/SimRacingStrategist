@@ -1,3 +1,7 @@
 @echo off
-start "" /b ".venv\Scripts\pythonw.exe" -m app.main
-exit
+cd /d "%~dp0"
+
+".venv\Scripts\python.exe" -m app.main
+
+pause
+
