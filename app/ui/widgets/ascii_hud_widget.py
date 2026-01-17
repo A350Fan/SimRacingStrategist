@@ -490,10 +490,25 @@ class AsciiHudWidget(QtWidgets.QFrame):
             # Per-minisector colors (10 segments)
             seg_colors: list[QtGui.QColor] = []
 
+            # Color used to highlight the minisector you're CURRENTLY driving through.
+            # This prevents showing stale "last lap" colors on the active minisector.
+            ACTIVE = QtGui.QColor(90, 150, 255)  # blue highlight (change if you prefer grey)
+            # Alternative grey highlight:
+            # ACTIVE = QtGui.QColor(90, 90, 90)
+
             for mi in range(start, end + 1):
                 r = rows[mi]
 
-                # If minisector not completed yet -> keep neutral (it'll still be "inactive" if mi>=filled)
+                # -----------------------------
+                # highlight current minisector
+                # -----------------------------
+                # The tracker keeps last_ms visible across the lap line.
+                # So the active minisector would otherwise still show the previous lap's color.
+                if cur_mi is not None and mi == int(cur_mi):
+                    seg_colors.append(ACTIVE)
+                    continue
+
+                # If minisector has no measured value at all -> neutral
                 if getattr(r, "last_ms", None) is None:
                     seg_colors.append(NEUTRAL)
                     continue
