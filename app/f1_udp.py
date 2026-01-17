@@ -220,6 +220,10 @@ class F1UDPListener:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
+        # Debug log: never print() from worker threads (can spawn/raise console windows on Windows)
+        self._log = AppLogger(ui_sink=None)
+        self._dbg_last_ts = 0.0  # throttle
+
         # --- Data Health: last packet age (LIVE vs REPLAY getrennt) ---
         # LIVE UDP thread + Replay thread update these; UI reads them -> lock.
         self._pkt_lock = threading.Lock()
