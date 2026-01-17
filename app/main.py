@@ -842,7 +842,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     clt = getattr(state, "player_current_lap_time_ms", None)
                     llt = getattr(state, "player_last_lap_time_ms", None)
 
-                    print(
+                    self._dbg(
                         "[LIVE DBG]",
                         f"track_len_m={tl}",
                         f"lap_dist_m={None if ld is None else round(float(ld), 1)}",
