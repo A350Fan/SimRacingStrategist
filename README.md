@@ -40,7 +40,7 @@ or derived from any third-party telemetry tools.
 2. Navigate to the project directory and install dependencies (example using PowerShell):
 
 ```powershell
-cd SimRacingStrategist-<versionnumber>        (e.g. 0.2.0)
+cd SimRacingStrategist-<versionnumber>        (e.g. 0.3.3)
 
 py -m venv .venv
 
