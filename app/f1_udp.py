@@ -1879,7 +1879,7 @@ class F1UDPReplayListener(F1UDPListener):
 
     def _dispatch_packet(self, pid, hdr, data) -> None:
         """
-        This is a tiny shim that contains your existing pid==1/2/4/7 etc chain.
+        This is a tiny shim that contains your existing pid==1/2/4/7 etc. chain.
         We keep the chain in ONE place by moving it into this method.
         """
         # NOTE: Implemented by moving the existing pid-chain into this method in LIVE too.

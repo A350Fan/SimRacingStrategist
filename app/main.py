@@ -21,6 +21,7 @@ from app.f1_udp import F1UDPListener, F1UDPReplayListener, F1LiveState
 from app.logging_util import AppLogger
 from app.paths import cache_dir
 from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop
+from app.strategy import generate_strategy_cards
 from app.rain_engine import RainEngine
 from app.translator import Translator
 from app.track_map import track_label_from_id
@@ -1475,8 +1476,67 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.lblRainAdvice.text() != advice_line:
                 self.lblRainAdvice.setText(advice_line)
 
-            # WIP/DEBUG UI: verbose internal diagnostics (can be noisy; shown for dev visibility).
-            self.status.showMessage(out.debug)
+            # --- Strategy Cards (track-scoped) ---
+            try:
+                # Prefer the exact slick compound if available (C1..C6), otherwise tyre category.
+                t_now = getattr(state, "player_tyre_compound", None) or getattr(state, "player_tyre_cat", None) or ""
+
+                # Wear average (remaining %) best-effort
+                wear_vals = [
+                    getattr(state, "player_wear_fl", None),
+                    getattr(state, "player_wear_fr", None),
+                    getattr(state, "player_wear_rl", None),
+                    getattr(state, "player_wear_rr", None),
+                ]
+                wear_vals = [float(v) for v in wear_vals if isinstance(v, (int, float))]
+                wear_avg = (sum(wear_vals) / len(wear_vals)) if wear_vals else None
+
+                cur_lap = getattr(state, "player_current_lap_num", None)
+                try:
+                    cur_lap = int(cur_lap) if cur_lap is not None else None
+                except Exception:
+                    cur_lap = None
+
+                # Convert "race laps" placeholder into laps remaining when possible
+                lr = None
+                try:
+                    lr = int(laps_remaining) if laps_remaining is not None else None
+                except Exception:
+                    lr = None
+                if lr is not None and cur_lap is not None:
+                    # spinRaceLaps currently stores "total laps" in the UI. Best-effort remaining.
+                    lr = max(0, int(lr - cur_lap))
+
+                # session label (P/Q/R) from UDP
+                try:
+                    session_label = self._session_label_from_udp(getattr(state, "session_type_id", None))
+                except Exception:
+                    session_label = ""
+
+                rec2, cards2 = generate_strategy_cards(
+                    track=track or "",
+                    session=session_label,
+                    current_lap=cur_lap,
+                    current_tyre=str(t_now),
+                    current_wear_avg=wear_avg,
+                    laps_remaining=lr,
+                    base_pit_loss_s=pit_loss_s,
+                    sc_status=getattr(state, "safety_car_status", None),
+                    db_rows=db_rows_list,
+                )
+
+                # Update UI (Live Raw tab is currently the active one for logic bindings)
+                scw = getattr(self.live_raw_tab, "strategyCardsWidget", None)
+                if scw is not None:
+                    scw.update_cards(rec2, cards2)
+
+                # Keep legacy alias in sync (some older code might read self.cardWidgets)
+                try:
+                    self.cardWidgets = scw.cardWidgets if scw is not None else self.cardWidgets
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
             # --- Field signals (share + pace deltas) ---
             if state.inter_share is None or state.inter_count is None or state.slick_count is None:
