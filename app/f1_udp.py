@@ -1863,10 +1863,13 @@ class F1UDPReplayListener(F1UDPListener):
             for k in self._your_laps:
                 self._your_laps[k].clear()
 
-        if self.debug:
-            print(
-                f"RX len={len(data)} fmt={hdr.get('packetFormat')} year={hdr.get('gameYear')} pid={hdr.get('packetId')}"
-            )
+        self._dbg(
+            "RX",
+            f"len={len(data)}",
+            f"fmt={hdr.get('packetFormat')}",
+            f"year={hdr.get('gameYear')}",
+            f"pid={hdr.get('packetId')}",
+        )
 
         # Now fall through to the same packetId handlers you already have:
         pid = hdr.get("packetId")
