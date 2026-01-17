@@ -14,10 +14,10 @@ Legend:
 ## NOW (Stabilize the core)
 
 ### Telemetry & Data Pipeline
-- ⏳ Add a "data health" panel/log summary:
-  - CSV import status (last file, last parse time)
-  - UDP status (connected, last packet age, port)
-  - DB write status (last insert/update)
+- 🚧 Add a "data health" panel/log summary:
+  - ✅ CSV import status (last file, last parse time)
+  - ✅ UDP status (connected, last packet age, port)
+  - ✅ DB write status (last insert/update)
 - ⏳ Improve CSV robustness:
   - handle missing/renamed columns gracefully
   - validate multi-block structure
