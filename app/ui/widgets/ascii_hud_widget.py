@@ -492,9 +492,9 @@ class AsciiHudWidget(QtWidgets.QFrame):
 
             # Color used to highlight the minisector you're CURRENTLY driving through.
             # This prevents showing stale "last lap" colors on the active minisector.
-            ACTIVE = QtGui.QColor(90, 150, 255)  # blue highlight (change if you prefer grey)
+            # ACTIVE = QtGui.QColor(90, 150, 255)  # blue highlight (change if you prefer grey)
             # Alternative grey highlight:
-            # ACTIVE = QtGui.QColor(90, 90, 90)
+            ACTIVE = QtGui.QColor(90, 90, 90)
 
             for mi in range(start, end + 1):
                 r = rows[mi]
