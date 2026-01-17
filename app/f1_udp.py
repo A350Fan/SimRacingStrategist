@@ -1386,10 +1386,12 @@ class F1UDPListener:
             if not hasattr(self, "_game_profile") or self._game_profile is None:
                 self._game_profile = self._resolve_game_profile(hdr)
 
-                if self.debug and self._game_profile:
-                    print(
-                        f"[GAME] Using profile: {self._game_profile.name} "
-                        f"(packetFormat={hdr.get('packetFormat')})"
+                if self._game_profile:
+                    self._dbg(
+                        "[GAME] Using profile:",
+                        self._game_profile.name,
+                        f"(packetFormat={hdr.get('packetFormat')})",
+                        throttle_s=5.0,
                     )
 
             # reset player ref buffers on session change (prevents mixing sessions)
