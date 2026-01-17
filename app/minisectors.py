@@ -145,6 +145,116 @@ class MiniSectorTracker:
             "complete": bool(complete),
         }
 
+    def sanity_check_snapshot(
+        self,
+        snap: dict,
+        *,
+        track_len_m: Optional[float],
+        sector2_start_m: Optional[float],
+        sector3_start_m: Optional[float],
+        vmin_kmh: float = 50.0,
+        vmax_kmh: float = 380.0,
+        abs_min_ms: int = 40,
+        abs_max_ms: int = 8000,
+        slack_lo: float = 0.50,
+        slack_hi: float = 1.50,
+    ) -> dict:
+        """
+        Per-track minisector sanity checker.
+
+        snap: dict like produced by _snapshot_lap()/pop_completed_laps()
+              (also matches the 'lap' dict used in main._append_udp_lap_csv)
+        Checks:
+          - missing indices
+          - unusual splits (too small / too large), using segment length and plausible speed bounds
+
+        Returns:
+          {
+            "ok": bool,
+            "missing": [ms_no...],
+            "too_small": [{"ms_no":..,"split_ms":..,"min_ms":..,"seg_m":..}, ...],
+            "too_large": [{"ms_no":..,"split_ms":..,"max_ms":..,"seg_m":..}, ...],
+            "notes": [str...]
+          }
+        """
+        out = {
+            "ok": True,
+            "missing": [],
+            "too_small": [],
+            "too_large": [],
+            "notes": [],
+        }
+
+        tl = float(track_len_m or 0.0)
+        s2 = None if sector2_start_m is None else float(sector2_start_m)
+        s3 = None if sector3_start_m is None else float(sector3_start_m)
+
+        # Need track + sector boundaries to do per-track plausibility
+        if not (tl > 0.0 and s2 is not None and s3 is not None and 0.0 < s2 < s3 < tl):
+            out["ok"] = False
+            out["notes"].append("sanity_check_snapshot: missing/invalid track_len or sector starts")
+            return out
+
+        minis = snap.get("minis") or []
+        # --- missing indices ---
+        for m in minis:
+            ms_no = m.get("ms_no")
+            split = m.get("split_ms")
+            if ms_no is None:
+                continue
+            if split is None:
+                out["missing"].append(int(ms_no))
+
+        # --- plausibility thresholds derived from segment length + speed bounds ---
+        # Convert speed bounds to m/s
+        vmin = max(1.0, float(vmin_kmh)) / 3.6
+        vmax = max(vmin + 0.1, float(vmax_kmh)) / 3.6
+
+        for m in minis:
+            ms_no = m.get("ms_no")
+            split = m.get("split_ms")
+            if ms_no is None or split is None:
+                continue
+
+            try:
+                ms_no_i = int(ms_no)
+                split_i = int(split)
+            except Exception:
+                continue
+
+            idx0 = ms_no_i - 1
+            seg_a, seg_b = self._bounds_for_idx(idx0, tl, s2, s3)
+            seg_m = max(0.0, float(seg_b - seg_a))
+
+            # expected min/max time for that distance, given vmax/vmin
+            # (with slack to avoid false positives due to kerbs, slow corners, standing starts etc.)
+            t_min_ms = int(round((seg_m / vmax) * 1000.0))
+            t_max_ms = int(round((seg_m / vmin) * 1000.0))
+
+            # also apply absolute caps to catch "0ms" or "1 minute minisector"
+            min_ms = max(int(abs_min_ms), int(round(t_min_ms * slack_lo)))
+            max_ms = min(int(abs_max_ms), int(round(t_max_ms * slack_hi)))
+
+            if split_i < min_ms:
+                out["too_small"].append({
+                    "ms_no": ms_no_i,
+                    "split_ms": split_i,
+                    "min_ms": int(min_ms),
+                    "seg_m": round(seg_m, 2),
+                })
+            elif split_i > max_ms:
+                out["too_large"].append({
+                    "ms_no": ms_no_i,
+                    "split_ms": split_i,
+                    "max_ms": int(max_ms),
+                    "seg_m": round(seg_m, 2),
+                })
+
+        if out["missing"] or out["too_small"] or out["too_large"]:
+            out["ok"] = False
+
+        return out
+
     def reset_lap(self, cur_lap_time_ms: Optional[int]) -> None:
         # Start a new lap timeline: Last values are per-lap, PB/Best are session-wide.
         # Clearing Last here prevents stale minisector times from leaking into the next lap

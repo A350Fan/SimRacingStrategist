@@ -1155,6 +1155,49 @@ class MainWindow(QtWidgets.QMainWindow):
 
                     minis_sum += iv
 
+            # ---- Minisector debug dump + sanity check (per lap snapshot) ----
+            try:
+                tl = getattr(state, "track_length_m", None)
+                s2m = getattr(state, "sector2_start_m", None)
+                s3m = getattr(state, "sector3_start_m", None)
+
+                # Compact one-liner dump (good for scanning app.log)
+                miss_txt = ("none" if not missing else ",".join(str(x) for x in missing))
+                self.logger.info(
+                    f"[MS SNAP] lap={lap.get('lap_num')} lap_ms={lap.get('lap_time_ms')} "
+                    f"complete={bool(complete)} miss={miss_txt} minis_sum_ms={minis_sum} "
+                    f"ms01_est={ms01_estimated}"
+                )
+
+                # Per-track sanity checker: unusual splits / missing indices
+                chk = self.ms.sanity_check_snapshot(
+                    lap,
+                    track_len_m=tl,
+                    sector2_start_m=s2m,
+                    sector3_start_m=s3m,
+                )
+                if not chk.get("ok", True):
+                    self.logger.info(
+                        "[MS SANITY] "
+                        f"lap={lap.get('lap_num')} "
+                        f"missing={chk.get('missing')} "
+                        f"too_small={len(chk.get('too_small') or [])} "
+                        f"too_large={len(chk.get('too_large') or [])} "
+                        f"notes={chk.get('notes')}"
+                    )
+
+                    # If you want details, dump them (still compact enough)
+                    ts = chk.get("too_small") or []
+                    tlg = chk.get("too_large") or []
+                    if ts:
+                        self.logger.info(f"[MS SANITY] too_small: {ts}")
+                    if tlg:
+                        self.logger.info(f"[MS SANITY] too_large: {tlg}")
+
+            except Exception:
+                # Never break lap writing due to debug tooling
+                pass
+
             ms_cols = [f"MS{n:02d}_ms" for n in range(1, total_minis + 1)]
 
             # ---- game label (best-effort) ----
