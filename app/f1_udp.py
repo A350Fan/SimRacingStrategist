@@ -1641,8 +1641,7 @@ class F1UDPListener:
         if profile.packet_format != pkt_fmt:
             try:
                 # prefer logger if you have it wired, else print (only when debug)
-                if self.debug:
-                    print(f"[WARN] Game mismatch: Settings={profile.name} UDP={pkt_fmt}")
+                self._dbg(f"[WARN] Game mismatch: Settings={profile.name} UDP={pkt_fmt}", throttle_s=5.0)
             except Exception:
                 pass
 
