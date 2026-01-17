@@ -15,7 +15,6 @@ from app.game_profiles import GAME_PROFILES
 from app.paths import cache_dir
 from app.logging_util import AppLogger
 
-
 # Codemasters Team IDs (F1 25)
 TEAM_ID_TO_NAME = {
     0: "Mercedes",
@@ -35,15 +34,14 @@ TEAM_ID_TO_NAME = {
 @dataclass
 class F1LiveState:
     safety_car_status: Optional[int] = None  # 0 none, 1 SC, 2 VSC, 3 formation lap
-    weather: Optional[int] = None            # enum (best-effort)
+    weather: Optional[int] = None  # enum (best-effort)
 
     # NEW: flags
     track_flag: Optional[int] = None  # from marshal zones: -1/0/1/2/3
     player_fia_flag: Optional[int] = None  # from car status:   -1/0/1/2/3
 
-
-    rain_now_pct: Optional[int] = None       # 0..100 (current rain)
-    rain_fc_pct: Optional[int] = None        # 0..100 (forecast next sample)
+    rain_now_pct: Optional[int] = None  # 0..100 (current rain)
+    rain_fc_pct: Optional[int] = None  # 0..100 (forecast next sample)
 
     # Forecast samples: list of (time_offset_min, rain_pct, weather_enum)
     rain_fc_series: Optional[list[tuple[int, int, int]]] = None
@@ -130,6 +128,7 @@ class F1LiveState:
     field_total_cars: Optional[int] = None
     unknown_tyre_count: Optional[int] = None
 
+
 def _read_header(data: bytes):
     """
     Supports:
@@ -153,8 +152,8 @@ def _read_header(data: bytes):
         try:
             u = struct.unpack_from("<HBBBBBQfIIBB", data, 0)
             return {
-                "packetFormat": int(u[0]),   # 2025
-                "gameYear": int(u[1]),       # 25
+                "packetFormat": int(u[0]),  # 2025
+                "gameYear": int(u[1]),  # 25
                 "packetId": int(u[5]),
                 "sessionUID": u[6],
                 "playerCarIndex": int(u[10]),
@@ -169,8 +168,8 @@ def _read_header(data: bytes):
         try:
             u = struct.unpack_from("<HBBBBQfIBB", data, 0)
             return {
-                "packetFormat": int(u[0]),   # 2020
-                "gameYear": 20,              # synthetic (for your debug print / UI)
+                "packetFormat": int(u[0]),  # 2020
+                "gameYear": 20,  # synthetic (for your debug print / UI)
                 "packetId": int(u[4]),
                 "sessionUID": u[5],
                 "playerCarIndex": int(u[8]),
@@ -183,11 +182,9 @@ def _read_header(data: bytes):
     return None
 
 
-
-
-
 class _Debounce:
     """Only accept a value if it stays the same for N updates or T seconds."""
+
     def __init__(self, n: int = 5, max_age_s: float = 1.0):
         self.n = n
         self.max_age_s = max_age_s
@@ -220,10 +217,6 @@ class F1UDPListener:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
-        # Debug log: never print() from worker threads (can spawn/raise console windows on Windows)
-        self._log = AppLogger(ui_sink=None)
-        self._dbg_last_ts = 0.0  # throttle
-
         # --- Data Health: last packet age (LIVE vs REPLAY getrennt) ---
         # LIVE UDP thread + Replay thread update these; UI reads them -> lock.
         self._pkt_lock = threading.Lock()
@@ -246,17 +239,15 @@ class F1UDPListener:
         # 0 invalid, 1 inactive, 2 active, 3 finished, ...
         self._result_status = [0] * 22
 
-
         self._emit_interval_s = 0.5  # 2 Hz
 
         # Outlap-Erkennung: nur wenn Lap deutlich langsamer als vorherige ist
         self._outlap_slow_ms = 8000  # 8s langsamer als vorherige Lap => sehr wahrscheinlich Outlap
 
-
         # --- Outlier filter (your reference laps) ---
-        self._your_outlier_sec = 2.5      # akzeptiere nur ±2.5s um Median
-        self._your_outlier_min_n = 3      # erst ab 3 vorhandenen Laps filtern
-        self._your_lap_min_s = 20.0       # harte Plausi-Grenzen
+        self._your_outlier_sec = 2.5  # akzeptiere nur ±2.5s um Median
+        self._your_outlier_min_n = 3  # erst ab 3 vorhandenen Laps filtern
+        self._your_lap_min_s = 20.0  # harte Plausi-Grenzen
         self._your_lap_max_s = 400.0
 
         self._last_emit_t = 0.0
@@ -272,9 +263,9 @@ class F1UDPListener:
         self._tyre_visual = [None] * 22
 
         # --- Lap quality ---
-        self._ignore_next_lap = [False] * 22   # True => nächste LapTime wird verworfen (Outlap nach Reifenwechsel)
-        self._last_tyre_cat = [None] * 22      # Merken, ob Reifenklasse gewechselt hat
-        self._lap_valid = [True] * 22          # Valid-Flag für "letzte Runde" pro Auto
+        self._ignore_next_lap = [False] * 22  # True => nächste LapTime wird verworfen (Outlap nach Reifenwechsel)
+        self._last_tyre_cat = [None] * 22  # Merken, ob Reifenklasse gewechselt hat
+        self._lap_valid = [True] * 22  # Valid-Flag für "letzte Runde" pro Auto
 
         # --- Player tracking ---
         self._player_idx: Optional[int] = None
@@ -333,26 +324,14 @@ class F1UDPListener:
 
                 # GUI apps often don't show print() -> log to app.log too
                 _log.info(f"UDP dump enabled -> {str(p)}")
-                self._dbg("[DUMP] Writing UDP dump to:", str(p))
+                if self.debug:
+                    print(f"[DUMP] Writing UDP dump to: {str(p)}")
 
         except Exception as e:
             self._dump_fp = None
             self._dump_path = None
             _log.error(f"UDP dump init failed: {type(e).__name__}: {e}")
         # ---------------------------------------------
-
-    def _dbg(self, *parts, throttle_s: float = 1.0) -> None:
-        if not self.debug:
-            return
-        try:
-            now = time.time()
-            if throttle_s is not None and (now - self._dbg_last_ts) < float(throttle_s):
-                return
-            self._dbg_last_ts = now
-            msg = " ".join(str(p) for p in parts)
-            self._log.info(msg)
-        except Exception:
-            pass
 
     def start(self):
         self._stop.clear()
@@ -430,7 +409,8 @@ class F1UDPListener:
     def _handle_packet(self, pid, hdr, data: bytes) -> None:
 
         if pid == 1:
-            self._dbg("[PID1] Session packet received len=", len(data))
+            if self.debug:
+                print("[PID1] Session packet received len=", len(data))
 
             # basic size sanity check
             if len(data) < 150:
@@ -547,13 +527,9 @@ class F1UDPListener:
             # --- Session packet fields (F1 25 spec) ---
             weather_raw = data[base + 0]  # 0..5
 
-            self._dbg(
-                "[SESSION] weather_raw",
-                weather_raw,
-                "trackTemp",
-                int.from_bytes(data[base + 1:base + 2], "little", signed=True),
-                throttle_s=2.0,
-            )
+            if self.debug:
+                print("[SESSION] weather_raw", weather_raw, "trackTemp",
+                      int.from_bytes(data[base + 1:base + 2], "little", signed=True))
 
             safety_car_off = base + 19 + (21 * 5)
             if safety_car_off + 3 >= len(data):
@@ -1233,7 +1209,8 @@ class F1UDPListener:
                 if self._tyre_cat[j] in ("INTER", "WET"):
                     interwet.append(
                         (j, self._tyre_cat[j], self._last_lap_ms[j], self._tyre_actual[j], self._tyre_visual[j]))
-            self._dbg("[TYRE DEBUG] inter/wet cars:", interwet)
+            if self.debug:
+                print("[TYRE DEBUG] inter/wet cars:", interwet)
 
             if changed:
                 self._dirty = True
@@ -1329,7 +1306,7 @@ class F1UDPListener:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(("", self.port))
         sock.settimeout(0.5)
-        
+
         while not self._stop.is_set():
             try:
                 data, _addr = sock.recvfrom(2048)
@@ -1355,8 +1332,10 @@ class F1UDPListener:
 
                 # ---------------------------------------------------------------
 
-                # DEBUG: zeigen ob überhaupt UDP ankommt (throttled -> no console spam)
-                self._dbg("RX", len(data), throttle_s=1.0)
+                # DEBUG: zeigen ob überhaupt UDP ankommt
+                if self.debug:
+                    print("RX", len(data))
+
 
             except socket.timeout:
                 continue
@@ -1386,12 +1365,10 @@ class F1UDPListener:
             if not hasattr(self, "_game_profile") or self._game_profile is None:
                 self._game_profile = self._resolve_game_profile(hdr)
 
-                if self._game_profile:
-                    self._dbg(
-                        "[GAME] Using profile:",
-                        self._game_profile.name,
-                        f"(packetFormat={hdr.get('packetFormat')})",
-                        throttle_s=5.0,
+                if self.debug and self._game_profile:
+                    print(
+                        f"[GAME] Using profile: {self._game_profile.name} "
+                        f"(packetFormat={hdr.get('packetFormat')})"
                     )
 
             # reset player ref buffers on session change (prevents mixing sessions)
@@ -1401,13 +1378,10 @@ class F1UDPListener:
                     self._your_laps[k].clear()
 
             # DEBUG: Packet IDs zählen/anzeigen
-            self._dbg(
-                "RX",
-                f"len={len(data)}",
-                f"fmt={hdr.get('packetFormat')}",
-                f"year={hdr.get('gameYear')}",
-                f"pid={hdr.get('packetId')}",
-            )
+            if self.debug:
+                print(
+                    f"RX len={len(data)} fmt={hdr.get('packetFormat')} year={hdr.get('gameYear')} pid={hdr.get('packetId')}"
+                )
 
             pid = hdr.get("packetId")
             try:
@@ -1450,12 +1424,11 @@ class F1UDPListener:
         self.state.field_total_cars = len(active_idx)
         self.state.unknown_tyre_count = unknown
 
-        self._dbg(
-            "[TYRE DEBUG] field_total:",
-            len(active_idx),
-            "inter:", inter, "wet:", wet, "slick:", slick, "unknown:", unknown,
-            throttle_s=2.0,
-        )
+        if self.debug:
+            print(
+                "[TYRE DEBUG] field_total:", len(active_idx),
+                "inter:", inter, "wet:", wet, "slick:", slick, "unknown:", unknown
+            )
 
         # compat: inter_share == (INTER+WET)/(SLICK+INTER+WET)  [unknown excluded]
         self.state.inter_share = (interwet / denom) if denom > 0 else 0.0
@@ -1539,7 +1512,6 @@ class F1UDPListener:
         self.state.pace_delta_wet_vs_inter_s = statistics.median(deltas_wi) if len(deltas_wi) >= 3 else None
         self.state.pace_delta_wet_vs_slick_s = statistics.median(deltas_ws) if len(deltas_ws) >= 3 else None
 
-
         # --- Your delta (learned from your own laps) ---
         s = list(self._your_laps["SLICK"])
         i_ = list(self._your_laps["INTER"])
@@ -1562,14 +1534,14 @@ class F1UDPListener:
         else:
             self.state.your_delta_wet_vs_inter_s = None
 
-
         # emit
         try:
             self.on_state(self.state)
         except Exception:
             pass
 
-        self._dbg("[DELTA DEBUG] percar_deltas", len(deltas), "field_delta", self.state.pace_delta_inter_vs_slick_s)
+        if self.debug:
+            print("[DELTA DEBUG] percar_deltas", len(deltas), "field_delta", self.state.pace_delta_inter_vs_slick_s)
 
     def _maybe_emit(self):
         if not getattr(self, "_dirty", False):
@@ -1641,7 +1613,8 @@ class F1UDPListener:
         if profile.packet_format != pkt_fmt:
             try:
                 # prefer logger if you have it wired, else print (only when debug)
-                self._dbg(f"[WARN] Game mismatch: Settings={profile.name} UDP={pkt_fmt}", throttle_s=5.0)
+                if self.debug:
+                    print(f"[WARN] Game mismatch: Settings={profile.name} UDP={pkt_fmt}")
             except Exception:
                 pass
 
@@ -1756,6 +1729,7 @@ def _find_rain_next_from_session_packet(data: bytes, base: int = 24):
     _, off_num, n, rain_next, layout = best
     return float(rain_next), f"forecast_found off_num={off_num} n={n} layout={layout}"
 
+
 class F1UDPReplayListener(F1UDPListener):
     """
     Offline replay for previously recorded UDP dumps.
@@ -1765,7 +1739,8 @@ class F1UDPReplayListener(F1UDPListener):
     where t_ms is monotonic milliseconds recorded during capture.
     """
 
-    def __init__(self, replay_file: str, on_state: Callable[[F1LiveState], None], *, speed: float = 1.0, debug: bool = True):
+    def __init__(self, replay_file: str, on_state: Callable[[F1LiveState], None], *, speed: float = 1.0,
+                 debug: bool = True):
         # port unused for replay, but keep base init intact
         super().__init__(port=0, on_state=on_state, debug=debug)
         self.replay_file = str(replay_file or "").strip()
@@ -1782,10 +1757,12 @@ class F1UDPReplayListener(F1UDPListener):
     def _run(self):
         p = Path(self.replay_file)
         if not p.exists() or not p.is_file():
-            self._dbg(f"[REPLAY] File not found: {self.replay_file}", throttle_s=5.0)
+            if self.debug:
+                print(f"[REPLAY] File not found: {self.replay_file}")
             return
 
-        self._dbg(f"[REPLAY] Playing: {self.replay_file} @ speed={self.speed}x", throttle_s=5.0)
+        if self.debug:
+            print(f"[REPLAY] Playing: {self.replay_file} @ speed={self.speed}x")
 
         try:
             with p.open("rb") as f:
@@ -1834,7 +1811,8 @@ class F1UDPReplayListener(F1UDPListener):
                     self._process_one_payload(payload)
 
         except Exception as e:
-            self._dbg("[REPLAY] error:", repr(e), throttle_s=5.0)
+            if self.debug:
+                print("[REPLAY] error:", repr(e))
 
     def _process_one_payload(self, data: bytes) -> None:
         """
@@ -1870,9 +1848,9 @@ class F1UDPReplayListener(F1UDPListener):
         if not hasattr(self, "_game_profile") or self._game_profile is None:
             self._game_profile = self._resolve_game_profile(hdr)
             if self.debug and self._game_profile:
-                self._dbg(
+                print(
                     f"[GAME] Using profile: {self._game_profile.name} "
-                    f"(packetFormat={hdr.get('packetFormat')})", throttle_s=5.0
+                    f"(packetFormat={hdr.get('packetFormat')})"
                 )
 
         if self._session_uid != self._last_session_uid:
@@ -1880,13 +1858,10 @@ class F1UDPReplayListener(F1UDPListener):
             for k in self._your_laps:
                 self._your_laps[k].clear()
 
-        self._dbg(
-            "RX",
-            f"len={len(data)}",
-            f"fmt={hdr.get('packetFormat')}",
-            f"year={hdr.get('gameYear')}",
-            f"pid={hdr.get('packetId')}",
-        )
+        if self.debug:
+            print(
+                f"RX len={len(data)} fmt={hdr.get('packetFormat')} year={hdr.get('gameYear')} pid={hdr.get('packetId')}"
+            )
 
         # Now fall through to the same packetId handlers you already have:
         pid = hdr.get("packetId")
@@ -1899,7 +1874,7 @@ class F1UDPReplayListener(F1UDPListener):
 
     def _dispatch_packet(self, pid, hdr, data) -> None:
         """
-        This is a tiny shim that contains your existing pid==1/2/4/7 etc. chain.
+        This is a tiny shim that contains your existing pid==1/2/4/7 etc chain.
         We keep the chain in ONE place by moving it into this method.
         """
         # NOTE: Implemented by moving the existing pid-chain into this method in LIVE too.

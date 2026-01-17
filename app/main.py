@@ -21,7 +21,6 @@ from app.f1_udp import F1UDPListener, F1UDPReplayListener, F1LiveState
 from app.logging_util import AppLogger
 from app.paths import cache_dir
 from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop
-from app.strategy import generate_strategy_cards, TeamContext
 from app.rain_engine import RainEngine
 from app.translator import Translator
 from app.track_map import track_label_from_id
@@ -31,7 +30,6 @@ import sys
 import re
 import csv
 import shutil
-
 
 _RE_RACE = re.compile(r"(^|_)r($|_)")
 _RE_QUALI = re.compile(r"(^|_)q($|_)|(^|_)q[123]($|_)")
@@ -95,7 +93,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.rain_engine = RainEngine()
         self.ms = MiniSectorTracker()
 
-
         self._your_last_lap_s = None
         self._your_last_tyre = None
         self._your_last_track = None
@@ -104,7 +101,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Debug throttle for live telemetry prints
         self._live_dbg_last_ts = 0.0
-
 
     # NOTE: Legacy implementation of _detect_session() (inline regex calls) was replaced
     # by precompiled regex constants (_RE_RACE/_RE_QUALI/_RE_PRACTICE) for readability and speed.
@@ -376,7 +372,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._act_export_db = act_export
         self._act_clear_cache = act_clear_cache
 
-
     @QtCore.Slot()
     def _on_export_db_csv(self) -> None:
         """
@@ -408,7 +403,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
             except Exception:
                 pass
-
 
     @QtCore.Slot()
     def _on_clear_cache(self) -> None:
@@ -459,7 +453,6 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception:
                 pass
 
-
     def _health_now_str(self) -> str:
         """Human-readable timestamp for the health panel (local time)."""
         try:
@@ -490,6 +483,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._refresh_health_panel()
         except Exception:
             pass
+
     # -------------------------------------------------------------
 
     def _refresh_health_panel(self) -> None:
@@ -759,7 +753,6 @@ class MainWindow(QtWidgets.QMainWindow):
         key = f"tyre.{norm}"
         return self._tr_keep(key, tyre)
 
-
     def _restart_services(self):
         self._stop_services()
         self._start_services_if_possible()
@@ -814,8 +807,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 pass
             self.out_watcher = None
         if self.udp:
-            try: self.udp.stop()
-            except Exception: pass
+            try:
+                self.udp.stop()
+            except Exception:
+                pass
             self.udp = None
 
     @QtCore.Slot(object)
@@ -842,7 +837,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     clt = getattr(state, "player_current_lap_time_ms", None)
                     llt = getattr(state, "player_last_lap_time_ms", None)
 
-                    self._dbg(
+                    print(
                         "[LIVE DBG]",
                         f"track_len_m={tl}",
                         f"lap_dist_m={None if ld is None else round(float(ld), 1)}",
@@ -1010,7 +1005,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 })
         except Exception:
             pass
-
 
         # Update UI/DB views like the CSV path does
         QtCore.QMetaObject.invokeMethod(self, "_after_db_update", QtCore.Qt.QueuedConnection)
@@ -1476,82 +1470,8 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.lblRainAdvice.text() != advice_line:
                 self.lblRainAdvice.setText(advice_line)
 
-            # --- Strategy Cards (track-scoped) ---
-            try:
-                # Prefer the exact slick compound if available (C1..C6), otherwise tyre category.
-                t_now = getattr(state, "player_tyre_compound", None) or getattr(state, "player_tyre_cat", None) or ""
-
-                # Wear average (remaining %) best-effort
-                wear_vals = [
-                    getattr(state, "player_wear_fl", None),
-                    getattr(state, "player_wear_fr", None),
-                    getattr(state, "player_wear_rl", None),
-                    getattr(state, "player_wear_rr", None),
-                ]
-                wear_vals = [float(v) for v in wear_vals if isinstance(v, (int, float))]
-                wear_avg = (sum(wear_vals) / len(wear_vals)) if wear_vals else None
-
-                cur_lap = getattr(state, "player_current_lap_num", None)
-                try:
-                    cur_lap = int(cur_lap) if cur_lap is not None else None
-                except Exception:
-                    cur_lap = None
-
-                # Convert "race laps" placeholder into laps remaining when possible
-                lr = None
-                try:
-                    lr = int(laps_remaining) if laps_remaining is not None else None
-                except Exception:
-                    lr = None
-                if lr is not None and cur_lap is not None:
-                    # spinRaceLaps currently stores "total laps" in the UI. Best-effort remaining.
-                    lr = max(0, int(lr - cur_lap))
-
-                # session label (P/Q/R) from UDP
-                try:
-                    session_label = self._session_label_from_udp(getattr(state, "session_type_id", None))
-                except Exception:
-                    session_label = ""
-
-                track = track_label_from_id(state.track_id)
-
-                # TODO: später sauber aus UDP ableiten
-                gap_ahead = getattr(state, "gap_ahead_s", None)
-                gap_behind = getattr(state, "gap_behind_s", None)
-
-                pit_loss = 22.0  # placeholder, track-specific later
-
-                team_ctx = TeamContext(
-                    track=track,
-                    gap_ahead_s=gap_ahead,
-                    gap_behind_s=gap_behind,
-                    pit_loss_s=pit_loss,
-                )
-
-                rec2, cards2 = generate_strategy_cards(
-                    track=track or "",
-                    session=session_label,
-                    current_lap=cur_lap,
-                    current_tyre=str(t_now),
-                    current_wear_avg=wear_avg,
-                    laps_remaining=lr,
-                    base_pit_loss_s=pit_loss_s,
-                    sc_status=getattr(state, "safety_car_status", None),
-                    db_rows=db_rows_list,
-                )
-
-                # Update UI (Live Raw tab is currently the active one for logic bindings)
-                scw = getattr(self.live_raw_tab, "strategyCardsWidget", None)
-                if scw is not None:
-                    scw.update_cards(rec2, cards2)
-
-                # Keep legacy alias in sync (some older code might read self.cardWidgets)
-                try:
-                    self.cardWidgets = scw.cardWidgets if scw is not None else self.cardWidgets
-                except Exception:
-                    pass
-            except Exception:
-                pass
+            # WIP/DEBUG UI: verbose internal diagnostics (can be noisy; shown for dev visibility).
+            self.status.showMessage(out.debug)
 
             # --- Field signals (share + pace deltas) ---
             if state.inter_share is None or state.inter_count is None or state.slick_count is None:
@@ -1661,7 +1581,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 lum = 0.2126 * bg.red() + 0.7152 * bg.green() + 0.0722 * bg.blue()
                 item.setForeground(QtGui.QColor(0, 0, 0) if lum > 140 else QtGui.QColor(255, 255, 255))
 
-
             for mi, r in enumerate(rows):
                 i = mini_to_table_row(mi)
 
@@ -1680,7 +1599,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 if r.last_ms is not None and r.pb_ms is not None:
                     d = r.last_ms - r.pb_ms
 
-                delta_txt = "—" if d is None else f"{d/1000.0:+.3f}"
+                delta_txt = "—" if d is None else f"{d / 1000.0:+.3f}"
                 self.tblMini.setItem(i, 4, QtWidgets.QTableWidgetItem(delta_txt))
 
                 # color logic:
@@ -1793,7 +1712,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if missing:
                 # show only first few to avoid UI spam
                 preview = ", ".join(f"{x:02d}" for x in missing[:6])
-                more = "" if len(missing) <= 6 else f" +{len(missing)-6}"
+                more = "" if len(missing) <= 6 else f" +{len(missing) - 6}"
                 self.lblTheoMiss.setText(f"Missing Last: {preview}{more}")
             else:
                 self.lblTheoMiss.setText("")
@@ -1811,7 +1730,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         except Exception as e:
             print("[MINISECTOR UI ERROR]", type(e).__name__, e)
-
 
     def _on_new_csv(self, src: Path, cached: Path):
         # ---- DEDUPE: gleiche Datei (create/modify) nur 1x verarbeiten ----
@@ -1855,8 +1773,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # except Exception:
         #     pass
 
-        #-------------------------------------------------------------------
-        
+        # -------------------------------------------------------------------
+
         name = src.stem.lower()
         if "_tt_" in name or name.endswith("_tt") or name.startswith("tt_"):
             self.logger.info(f"Skipped (time trial): {src.name}")
@@ -1926,7 +1844,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
             upsert_lap(str(src), summ)
             self._mark_db_ok()
-
 
             self.logger.info(
                 f"Imported: track={summ.get('track')} tyre={summ.get('tyre')} "
@@ -2002,7 +1919,7 @@ class MainWindow(QtWidgets.QMainWindow):
             by_group.setdefault(key, []).append(i)
 
         lapno = {}  # row_index -> lap number
-       
+
         tags = ["OK"] * len(rows)
 
         WEAR_DROP_THR = 2.0
@@ -2121,7 +2038,6 @@ class MainWindow(QtWidgets.QMainWindow):
             tracks = []
         self.cmbTrack.clear()
         self.cmbTrack.addItems(tracks)
-
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self._stop_services()
@@ -2311,6 +2227,7 @@ def main():
     w = MainWindow()
     w.show()
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()
