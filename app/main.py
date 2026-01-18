@@ -856,7 +856,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 track_len_m=getattr(state, "track_length_m", None),
                 sector2_start_m=getattr(state, "sector2_start_m", None),
                 sector3_start_m=getattr(state, "sector3_start_m", None),
-                allow_sector_fallback=(getattr(state, "game_year", None) == 20),
+                allow_sector_fallback=(int(getattr(state, "packet_format", 0) or 0) < 2025),
             )
 
             if changed:

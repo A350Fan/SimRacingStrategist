@@ -45,7 +45,7 @@ GAME_PROFILES = {
     "F1_24": GameProfile(
         key="F1_24",
         name="F1 24",
-        packet_format=2021,
+        packet_format=2024,
         header_size=24,
         lap_car_size=53,
         car_status_size=60,
@@ -57,7 +57,7 @@ GAME_PROFILES = {
     "F1_23": GameProfile(
         key="F1_23",
         name="F1 23",
-        packet_format=2021,
+        packet_format=2023,
         header_size=24,
         lap_car_size=53,
         car_status_size=60,
@@ -70,7 +70,7 @@ GAME_PROFILES = {
     "F1_22": GameProfile(
         key="F1_22",
         name="F1 22",
-        packet_format=2021,
+        packet_format=2022,
         header_size=24,
         lap_car_size=53,
         car_status_size=60,
