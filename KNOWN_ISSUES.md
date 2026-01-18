@@ -16,7 +16,7 @@ When restarting a session, every minisector is filled with a tiny number (0.xxx 
 
 **Impact:**  
 - Inconsistent minisector times  
-- PB / best values may be corrupted  
+- PB / absolute best values may be corrupted  
 
 **Workaround:**  
 Flashback: Rollback logic only removes minisectors whose `end_ms` is greater than the current lap time.
@@ -38,7 +38,7 @@ As a result, minisector times and theoretical lap times may partially deviate fr
 
 **Impact:**  
 - Inaccurate minisector times  
-- PB / best values may be affected
+- PB / absolute best values may be affected
 - inaccurate lap predictions
 
 **Planned fix:**  
@@ -174,7 +174,7 @@ Connect to real strategy outputs.
 - speed etc. have no data
 
 **Impact:**  
-- some features are just not done yet --> can't use them  
+- some features are just not done yet → can't use them  
 
 **Planned fix:**  
 - finish UI implementation
