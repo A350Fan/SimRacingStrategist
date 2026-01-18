@@ -360,7 +360,7 @@ def estimate_degradation_for_track_tyre(
 
     max_from_fresh = None
     if wear_per_lap > 0.0:
-        max_from_fresh = (wear_threshold) / wear_per_lap
+        max_from_fresh = wear_threshold / wear_per_lap
         max_from_fresh = max(0.0, max_from_fresh)
 
 
@@ -439,7 +439,7 @@ def pit_windows_two_stop(race_laps: int, max_stint_laps: float, min_stint_laps: 
     s2_earliest = min(x[1] for x in feasible)
     s2_latest   = max(x[1] for x in feasible)
 
-    return (s1_earliest, s1_latest, s2_earliest, s2_latest)
+    return s1_earliest, s1_latest, s2_earliest, s2_latest
 
 @dataclass
 class RainPitAdvice:

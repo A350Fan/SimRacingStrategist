@@ -10,7 +10,7 @@ from app.ui.widgets.ascii_hud_widget import AsciiHudWidget
 class LiveTabWidget(QtWidgets.QWidget):
     """
     Live (GUI) Tab - new compact UI (WIP).
-    For now we start by adding a proper flag indicator (painted, no image assets).
+    For now, we start by adding a proper flag indicator (painted, no image assets).
     """
 
     # thread-safe state handover (UDP thread -> UI thread)

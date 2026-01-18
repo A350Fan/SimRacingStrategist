@@ -113,7 +113,7 @@ class F1LiveState:
     player_car_index: Optional[int] = None
     player_tyre_cat: Optional[str] = None  # "SLICK" / "INTER" / "WET"
 
-    # NEW: exact compound label for slicks ("C1".."C6"), otherwise same as category ("INTER"/"WET").
+    # NEW: exact compound label for slicks ("C1"-"C6"), otherwise same as category ("INTER"/"WET").
     # Intended for lap DB + later strategy logic. Keep player_tyre_cat as the coarse class.
     player_tyre_compound: Optional[str] = None
 
@@ -503,7 +503,7 @@ class F1UDPListener:
             # NACHDEM du self.state.track_length_m gesetzt hast (F1 25 / pkt_fmt >= 2025):
             # Im F1 25 Spec liegen diese beiden floats am Ende vom PacketSessionData:
             # float m_sector2LapDistanceStart; float m_sector3LapDistanceStart;
-            # -> best-effort: von hinten lesen, wenn genug Bytes da sind.
+            # → best-effort: von hinten lesen, wenn genug Bytes da sind.
 
             if hdr.get("packetFormat", 0) >= 2025 and len(data) >= 8:
                 try:
@@ -682,10 +682,6 @@ class F1UDPListener:
                 self._dirty = True
 
         elif pid == 2:
-
-            base = int(hdr.get("headerSize", 29))
-
-            changed = False
 
             # PacketLapData total size is 1285 bytes in F1 25 spec.
 
@@ -970,7 +966,7 @@ class F1UDPListener:
 
                 if i == self._player_idx:
 
-                    # lapDistance may be negative before crossing the line; keep it but it's fine
+                    # lapDistance may be negative before crossing the line; keep it, but it's fine
 
                     if self.state.player_lap_distance_m != float(lap_dist_m):
                         self.state.player_lap_distance_m = float(lap_dist_m)
@@ -1303,7 +1299,7 @@ class F1UDPListener:
                 else:
                     tyre_cat = "SLICK"
 
-                # NEW: exact compound label for DB/strategy (C1..C6 for slicks)
+                # NEW: exact compound label for DB/strategy (C1-C6 for slicks)
                 try:
                     self._tyre_compound[i] = self._compound_label(
                         actual=int(actual), visual=int(visual), tyre_cat=tyre_cat
@@ -1816,7 +1812,7 @@ class F1UDPListener:
         """Return exact tyre label for DB.
 
         - For INTER/WET: returns "INTER"/"WET".
-        - For slicks: tries to map to "C1".."C6" using known Codemasters codes.
+        - For slicks: tries to map to "C1"-"C6" using known Codemasters codes.
           Falls back to "SLICK" if unknown.
 
         NOTE: We keep player_tyre_cat as coarse class (SLICK/INTER/WET) for rain logic.
@@ -2066,7 +2062,7 @@ class F1UDPReplayListener(F1UDPListener):
 
     def _dispatch_packet(self, pid, hdr, data) -> None:
         """
-        This is a tiny shim that contains your existing pid==1/2/4/7 etc chain.
+        This is a tiny shim that contains your existing pid==1/2/4/7 etc. chain.
         We keep the chain in ONE place by moving it into this method.
         """
         # NOTE: Implemented by moving the existing pid-chain into this method in LIVE too.

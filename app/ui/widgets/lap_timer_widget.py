@@ -247,7 +247,7 @@ class LapTimerWidget(QtWidgets.QWidget):
         crossed = self._detect_sf_crossing(lap_num=lap_num, dist_m=dist_m)
         if crossed:
             # If lap number increments, _last_lap_num is the lap we just finished.
-            # Otherwise best-effort use current lap_num.
+            # Otherwise, best-effort use current lap_num.
             completed_lap_num = self._last_lap_num if self._last_lap_num is not None else self._safe_int(lap_num)
             self._complete_lap_and_restart(completed_lap_num=completed_lap_num)
 
@@ -331,7 +331,7 @@ class LapTimerWidget(QtWidgets.QWidget):
         # --------
         # Fallback ohne TrackLength:
         # - Distanz muss innerhalb einer Runde monoton steigen.
-        # - Extrem große Werte sind fast sicher Müll -> verwerfen.
+        # - Extrem große Werte sind fast sicher Müll → verwerfen.
         # (25 km ist schon sehr großzügig)
         # --------
         if d > 25_000.0:
@@ -348,7 +348,7 @@ class LapTimerWidget(QtWidgets.QWidget):
     def _trace_add_point(self, dist_m: float, elapsed_ms: int) -> None:
         """
         Add a (dist, time) sample if it is "new enough" vs last sample.
-        Assumes dist is already normalized and within [0, tl).
+        Assumes dist is already normalized and within [0, tl].
         """
         if dist_m is None or elapsed_ms is None:
             return

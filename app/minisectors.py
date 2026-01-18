@@ -1,7 +1,7 @@
 # app/minisectors.py
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 
 MINIS_PER_SECTOR = 10
@@ -172,8 +172,8 @@ class MiniSectorTracker:
           {
             "ok": bool,
             "missing": [ms_no...],
-            "too_small": [{"ms_no":..,"split_ms":..,"min_ms":..,"seg_m":..}, ...],
-            "too_large": [{"ms_no":..,"split_ms":..,"max_ms":..,"seg_m":..}, ...],
+            "too_small": [{"ms_no":...,"split_ms":...,"min_ms":...,"seg_m":...}, ...],
+            "too_large": [{"ms_no":...,"split_ms":...,"max_ms":...,"seg_m":...}, ...],
             "notes": [str...]
           }
         """
@@ -368,9 +368,9 @@ class MiniSectorTracker:
         """
         idx = max(0, min(int(idx), TOTAL_MINIS - 1))
 
-        # sector 1: [0, s2)
-        # sector 2: [s2, s3)
-        # sector 3: [s3, tl)
+        # sector 1: [0, s2]
+        # sector 2: [s2, s3]
+        # sector 3: [s3, tl]
         if idx < self.minis_per_sector:
             a, b = 0.0, float(s2)
             j = idx
@@ -570,7 +570,7 @@ class MiniSectorTracker:
         # handler may close the last minisector using a stale _last_seen_lap_ms -> MS30 missing.
         self._last_seen_lap_ms = now_ms
 
-        # keep last seen distance inside lap domain (0..tl)
+        # keep last seen distance inside lap domain (0...tl)
         try:
             self._last_seen_dist_m = float(lap_dist_m) % tl
         except Exception:
@@ -623,7 +623,7 @@ class MiniSectorTracker:
                 self._just_lapped = False
 
             if treat_as_lap_start:
-                # Backfill minisectors 0..idx-1 proportionally by distance, then start timing from start of idx.
+                # Backfill minisectors 0...idx-1 proportionally by distance, then start timing from start of idx.
                 try:
                     start_d = float(self._start_for_idx(idx, tl, s2, s3))
                     # time from lap start (0ms) to start of current idx (distance proportion)

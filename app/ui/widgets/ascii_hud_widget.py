@@ -215,7 +215,7 @@ class AsciiHudWidget(QtWidgets.QFrame):
     One compact ASCII-style HUD panel:
       - LapTimerWidget top line (Lap / time / Δ vs PB)
       - status line
-      - Minisectors (S1..S3 bars)
+      - Minisectors (S1-S3 bars)
       - Live delta (value + bar)
       - Footer (speed/gear/throttle/brake)
     """

@@ -432,7 +432,7 @@ class RainEngine:
 
         fc_at = self._fc_window_stats(fc_series, mins)
 
-        # Extract values (may be None if no forecast series)
+        # Extract values (might be None if no forecast series)
         rain_nl = fc_at.get(next_lap_min_int)
         rain_3 = fc_at.get(3)
         rain_5 = fc_at.get(5)
@@ -488,13 +488,13 @@ class RainEngine:
         if track_slope_cpm is not None:
             # drop faster than ~0.6°C/min => strong wet signal
             wet_from_track = _clamp01(((-track_slope_cpm) - 0.20) / 0.80)
-            dry_from_track = _clamp01(((track_slope_cpm) - 0.20) / 0.80)
+            dry_from_track = _clamp01((track_slope_cpm - 0.20) / 0.80)
             s_temp = _clamp01(wet_from_track - 0.60 * dry_from_track + 0.50)
 
         # air temp is weaker, but can support transitions
         if s_temp is None and air_slope_cpm is not None:
             wet_from_air = _clamp01(((-air_slope_cpm) - 0.10) / 0.60)
-            dry_from_air = _clamp01(((air_slope_cpm) - 0.10) / 0.60)
+            dry_from_air = _clamp01((air_slope_cpm - 0.10) / 0.60)
             s_temp = _clamp01(wet_from_air - 0.50 * dry_from_air + 0.50)
 
 
