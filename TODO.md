@@ -119,8 +119,8 @@ Legend:
 ## LATER (Expansion & polish)
 
 ### Multi-Game Support
-- ⏳ Add F1 24 profile (then step-by-step down to F1 2017)
-  - 🧪 add F1 2020 profile (experimental)
+- 🧪 Add F1 24 profile (then step-by-step down to F1 2017)
+  - 🧪 add F1 2020 profile
 - ⏳ Compatibility layer for missing UDP features in older games
 - ⏳ Optional manual track profiles:
   - track length overrides
