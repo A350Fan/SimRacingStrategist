@@ -955,6 +955,23 @@ class MainWindow(QtWidgets.QMainWindow):
 
         lap_time_s = float(last_ms) / 1000.0
 
+        # Keep UI "Next Lap (NL)" horizon in sync even if we are NOT importing any Overtake/CSV files.
+        # Without this, _your_last_lap_s stays None and the UI falls back to 90s -> NL~1:20 forever.
+        try:
+            self._your_last_lap_s = float(lap_time_s)
+        except Exception:
+            self._your_last_lap_s = None
+
+        # Optional: also keep last tyre/track for debugging/consistency (doesn't break anything)
+        try:
+            self._your_last_tyre = tyre_label
+        except Exception:
+            pass
+        try:
+            self._your_last_track = track_label
+        except Exception:
+            pass
+
         # IMPORTANT: source_file must be unique
         source = f"udp://{sess_uid}/lap{lap_n if lap_n is not None else 'x'}/t{last_ms}"
 
@@ -1389,49 +1406,82 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.lblWeather.text() != weather_line:
                 self.lblWeather.setText(weather_line)
 
-            # --- Forecast helper: stepwise lookup for forecast values at given horizons (minutes).
-            # Only used for display text, not for final decision logic.
-            def _fc_at(series, tmin):
+            # --- Forecast helper (display only) ---
+            # We want a "Next lap" horizon derived from estimated lap time, but our forecast samples are minute-based.
+            # So we:
+            # 1) compute target seconds until "next lap decision point" (lap_time - margin)
+            # 2) convert to minutes (float)
+            # 3) pick the NEAREST available minute sample (not necessarily >=), because the feed is coarse (integer minutes).
+
+            def _fmt_mmss(seconds: float | None) -> str:
+                """Format seconds as M:SS (e.g. 80.0 -> '1:20')."""
+                if seconds is None:
+                    return self.tr.t("common.na", "n/a")
+                try:
+                    s = max(0.0, float(seconds))
+                except Exception:
+                    return self.tr.t("common.na", "n/a")
+                m = int(s // 60.0)
+                r = int(round(s - (m * 60.0)))
+                if r >= 60:
+                    m += 1
+                    r -= 60
+                return f"{m}:{r:02d}"
+
+            def _fc_nearest(series, tmin_float: float):
                 """
-                Stepwise forecast lookup:
-                returns the rain% of the nearest sample with timeOffset >= tmin.
-                If all samples are < tmin, return the last available sample.
+                Nearest-sample forecast lookup:
+                returns the rain% of the sample whose timeOffset (minutes) is closest to tmin_float.
+                If series is empty -> None.
                 """
                 if not series:
                     return None
 
-                # series: list[(min_from_now, rain_pct, weather_enum)] sorted by time
-                best = None
+                best_pct = None
+                best_dist = None
+
                 for tup in series:
                     try:
                         tm, pct, _w = tup
+                        tm_i = int(tm)  # forecast time offset is minute-based (int in UDP feed)
+                        pct_i = int(pct)  # rain %
                     except Exception:
                         continue
 
-                    try:
-                        tm_i = int(tm)
-                        pct_i = int(pct)
-                    except Exception:
-                        continue
+                    dist = abs(float(tm_i) - float(tmin_float))
+                    if best_dist is None or dist < best_dist:
+                        best_dist = dist
+                        best_pct = pct_i
 
-                    # first sample at/after horizon
-                    if tm_i >= int(tmin):
-                        best = pct_i
-                        break
-
-                if best is not None:
-                    return best
-
-                # horizon beyond last sample -> last known
-                try:
-                    return int(series[-1][1])
-                except Exception:
-                    return None
+                return best_pct
 
             fc = getattr(state, "rain_fc_series", None) or []
+
+            # --- estimate lap time ---
+            # Prefer the app's known "your last lap" estimate if available.
+            lap_est_s = None
+            try:
+                lap_est_s = float(getattr(self, "_your_last_lap_s", None) or 0.0)
+                if lap_est_s <= 0.0:
+                    lap_est_s = None
+            except Exception:
+                lap_est_s = None
+
+            # Fallback to a sensible default if we have nothing yet (outlap, session start, etc.)
+            if lap_est_s is None:
+                lap_est_s = 90.0  # 1:30 default
+
+            # We want the forecast early enough in the lap to decide to pit for "next lap".
+            # Example: 1:30 lap -> show next-lap forecast at ~1:20.
+            margin_s = 10.0
+            next_lap_s = max(30.0, lap_est_s - margin_s)  # keep sane (never too tiny)
+            next_lap_min = next_lap_s / 60.0  # float minutes target
+
+            # Build display list: NextLap first, then the classic fixed horizons
+            horizons = [("NL", next_lap_min), ("3", 3.0), ("5", 5.0), ("10", 10.0), ("15", 15.0), ("20", 20.0)]
             fc_list = []
-            for t in (3, 5, 10, 15, 20):
-                v = _fc_at(fc, t)
+            for _label, tmin in horizons:
+                v = _fc_nearest(fc, tmin)
                 if v is None:
                     fc_list.append(self.tr.t("common.na", "n/a"))
                 else:
@@ -1439,13 +1489,19 @@ class MainWindow(QtWidgets.QMainWindow):
                         fc_list.append(str(int(v)))
                     except Exception:
                         fc_list.append(self.tr.t("common.na", "n/a"))
+
             fc_txt = "/".join(fc_list)
 
             rain_now_txt = (rain_now_i if rain_now_i >= 0 else self.tr.t("common.na", "n/a"))
             rain_line = self.tr.t(
                 "live.rain_line_fmt",
-                "Rain: {now} | FC(3/5/10/15/20): {fc}"
-            ).format(now=rain_now_txt, fc=fc_txt)
+                "Rain: {now} | FC(NL~{nl}/3/5/10/15/20): {fc}"
+            ).format(
+                now=rain_now_txt,
+                nl=_fmt_mmss(next_lap_s),
+                fc=fc_txt
+            )
+
             if self.lblRain.text() != rain_line:
                 self.lblRain.setText(rain_line)
 
@@ -2261,8 +2317,25 @@ class MainWindow(QtWidgets.QMainWindow):
             }
 
             upsert_lap(str(src), summ)
+
+            # Keep UI NL horizon in sync when importing our own UDP lap CSV format as well.
+            try:
+                self._your_last_lap_s = float(lap_time_s) if lap_time_s is not None else None
+            except Exception:
+                self._your_last_lap_s = None
+
+            try:
+                self._your_last_tyre = tyre
+            except Exception:
+                pass
+            try:
+                self._your_last_track = track
+            except Exception:
+                pass
+
             self._mark_db_ok()
             return True
+
         except Exception as e:
             # still "recognized", so return True to avoid trying to parse as Iko CSV,
             # BUT: mark health properly so you see the failure.

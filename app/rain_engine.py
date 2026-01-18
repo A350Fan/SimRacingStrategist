@@ -402,16 +402,46 @@ class RainEngine:
         track_slope_cpm = self._slope_c_per_min(self._track_temp, window_s=90.0)  # °C/min
         air_slope_cpm = self._slope_c_per_min(self._air_temp, window_s=120.0)     # °C/min
 
-
         # --- Forecast-derived features ---
-        # pick a few horizons (minutes) that matter in-race
-        fc_at = self._fc_window_stats(fc_series, [3, 5, 10, 15, 20])
+        # We want a "next lap" horizon derived from lap time, but the UDP forecast is minute-based.
+        # Strategy: compute target seconds early in the lap (lap_time - margin), convert to minutes,
+        # then use CEIL -> first sample at/after that minute (conservative; avoids underestimating rain).
+        import math
 
-        rain_3 = fc_at[3]
-        rain_5 = fc_at[5]
-        rain_10 = fc_at[10]
-        rain_15 = fc_at[15]
-        rain_20 = fc_at[20]
+        # Estimate lap time (seconds)
+        lap_est_s = None
+        try:
+            lap_est_s = float(your_last_lap_s) if your_last_lap_s is not None else None
+            if lap_est_s is not None and lap_est_s <= 0.0:
+                lap_est_s = None
+        except Exception:
+            lap_est_s = None
+
+        if lap_est_s is None:
+            lap_est_s = 90.0  # default 1:30 if we have nothing yet
+
+        margin_s = 10.0
+        next_lap_s = max(30.0, lap_est_s - margin_s)  # keep sane
+        next_lap_min_int = int(math.ceil(next_lap_s / 60.0))
+
+        # Clamp to a sane forecast range (UDP usually has up to 240 minutes)
+        next_lap_min_int = max(1, min(240, next_lap_min_int))
+
+        # Build horizons: NextLap first + classic fixed horizons (minutes)
+        mins = sorted(set([next_lap_min_int, 3, 5, 10, 15, 20]))
+
+        fc_at = self._fc_window_stats(fc_series, mins)
+
+        # Extract values (may be None if no forecast series)
+        rain_nl = fc_at.get(next_lap_min_int)
+        rain_3 = fc_at.get(3)
+        rain_5 = fc_at.get(5)
+        rain_10 = fc_at.get(10)
+        rain_15 = fc_at.get(15)
+        rain_20 = fc_at.get(20)
+
+        # "Soon" = next-lap horizon if available, else fall back to 3min
+        rain_soon = rain_nl if rain_nl is not None else rain_3
 
         # "drying soon" if forecast drops below ~25% within 10-15 min
         t_dry = self._fc_time_to_below(fc_series, threshold=25)
