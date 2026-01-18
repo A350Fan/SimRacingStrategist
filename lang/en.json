@@ -11,7 +11,7 @@
   "live.strategy_group": "Strategy Cards (Prototype)",
   "live.sc": "SC/VSC: n/a",
   "live.weather": "Weather: n/a",
-  "live.rain": "Rain(next): n/a",
+  "live.rain": "Rain(Forecast): n/a",
   "live.rain_advice": "Rain pit: n/a",
   "live.field_share": "Field: Inter/Wet share: n/a",
   "live.field_delta": "Field: Δpace (I-S): n/a",
@@ -39,7 +39,7 @@
   "live.sc_formation": "Formation",
 
   "live.weather_enum_fmt": "Weather(enum): {w}",
-  "live.rain_line_fmt": "Rain: {now} | FC(3/5/10/15/20): {fc}",
+  "live.rain_line_fmt": "Rain: {now} | FC(NL~{nl}/3/5/10/15/20): {fc}",
 
   "live.rain_pit_advice_fmt": "Rain pit: {action} → {target} | wet={wet:.2f} conf={conf:.2f} | {reason}",
 
@@ -64,7 +64,7 @@
 
   "live.sc_na": "SC/VSC: n/a",
   "live.weather_na": "Weather: n/a",
-  "live.rain_na": "Rain(next): n/a",
+  "live.rain_na": "Rain(Forecast): n/a",
   "live.rain_pit_na": "Rain pit: n/a",
 
   "cards.group_title": "Strategy Cards (Prototype)",
