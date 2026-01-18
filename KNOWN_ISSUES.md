@@ -101,12 +101,29 @@ The current logic treats each lap as an isolated unit.
 **Planned fix:**  
 - Enforce separation between `last_ms` (current lap) and `pb_ms` (persistent best)  
 - Optional persistence of last valid minisector times across laps  
-- Clear feature flag: `persistent_minisectors=False` for older games  
+- Clear feature flag: `persistent_minisectors=False` for older games
+
+
+### KI-006 – F1 2017 - F1 24: Teams are not detected yet
+**Affected version(s):** v0.3.4 - v0.3.4   
+**Affected modules:** CSV logger  
+
+**Description:**  
+As F1 2017-24 compatibility is WIP, some features, like Team ID detection, might be inaccurate
+
+**Impact:**  
+- data might be misread  
+
+**Root cause:**  
+- byte reading in F1 2017 - 2024 is not perfectly working yet
+
+**Planned fix:**  
+- fix byte reading offsets  
 
 
 ---
 
-### KI-006 – Rain forecast occasionally reported as `n/a`
+### KI-007 – Rain forecast occasionally reported as `n/a`
 **Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** RainEngine, f1_udp  
 
@@ -129,7 +146,7 @@ Forecast pre-buffering using a minimum number of samples.
 
 ## 🟨 Low Issues
 
-### KI-007 – Strategy Cards are currently placeholders
+### KI-008 – Strategy Cards are currently placeholders
 **Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** UI  
 
@@ -147,7 +164,7 @@ Connect to real strategy outputs.
 
 ---
 
-### KI-008 – lap timing is not done yet
+### KI-009 – lap timing is not done yet
 **Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** UI  
 
@@ -166,7 +183,7 @@ Connect to real strategy outputs.
 
 ## 🧪 Experimental / Design-related Limitations
 
-### KI-009 – Field deltas not always available
+### KI-010 – Field deltas not always available
 **Affected version(s):** v0.1.0 - v0.3.1   
 **Affected modules:** RainEngine  
 
@@ -182,7 +199,7 @@ By design – sufficient sample size is required.
 
 ---
 
-### KI-010 – Tyre wear learning requires sufficient data
+### KI-011 – Tyre wear learning requires sufficient data
 **Affected version(s):** v0.1.0 - v0.3.1  
 **Affected modules:** Degradation Model  
 
