@@ -31,6 +31,59 @@ TEAM_ID_TO_NAME = {
 }
 
 
+# ============================================================
+# DEBUG: Minimal UDP header sniffer (F1 telemetry)
+# ============================================================
+
+HDR_FMT = "<HBBBBQfIBB"   # Codemasters UDP header (24 bytes)
+HDR_SIZE = struct.calcsize(HDR_FMT)
+
+def _hex_dump(b: bytes, n: int = 32) -> str:
+    return " ".join(f"{x:02X}" for x in b[:n])
+
+def _try_parse_f1_header(data: bytes):
+    """
+    Try to parse a Codemasters F1 UDP header at offset 0.
+    Returns dict if plausible, otherwise None.
+    """
+    if len(data) < HDR_SIZE:
+        return None
+
+    try:
+        (
+            packet_format,
+            game_major,
+            game_minor,
+            packet_version,
+            packet_id,
+            session_uid,
+            session_time,
+            frame_id,
+            player_idx,
+            secondary_idx,
+        ) = struct.unpack_from(HDR_FMT, data, 0)
+    except Exception:
+        return None
+
+    # Plausibility checks (very important!)
+    if not (2017 <= packet_format <= 2030):
+        return None
+    if not (0 <= packet_id <= 20):
+        return None
+
+    return {
+        "packet_format": packet_format,
+        "game_version": f"{game_major}.{game_minor}",
+        "packet_version": packet_version,
+        "packet_id": packet_id,
+        "session_uid": session_uid,
+        "session_time": session_time,
+        "frame_id": frame_id,
+        "player_idx": player_idx,
+        "secondary_idx": secondary_idx,
+    }
+
+
 @dataclass
 class F1LiveState:
     safety_car_status: Optional[int] = None  # 0 none, 1 SC, 2 VSC, 3 formation lap
@@ -162,14 +215,14 @@ def _read_header(data: bytes):
         except Exception:
             return None
 
-    # --- F1 2020 legacy (2020) ---
+    # --- F1 2017..2024 legacy style (24 bytes header) ---
     # Header 24 bytes (no gameYear, no overallFrameIdentifier)
-    if pkt_fmt == 2020:
+    if 2017 <= pkt_fmt <= 2024:
         try:
             u = struct.unpack_from("<HBBBBQfIBB", data, 0)
             return {
-                "packetFormat": int(u[0]),  # 2020
-                "gameYear": 20,  # synthetic (for your debug print / UI)
+                "packetFormat": int(u[0]),  # 2017-2024
+                "gameYear": int(u[0]) - 2000,  # synthetic: 2022 -> 22 (matches your UI style)
                 "packetId": int(u[4]),
                 "sessionUID": u[5],
                 "playerCarIndex": int(u[8]),
@@ -1332,6 +1385,29 @@ class F1UDPListener:
 
                 # ---------------------------------------------------------------
 
+                # ========================================================
+                # DEBUG: RAW UDP HEADER SNIFFER (before any parsing!)
+                # ========================================================
+                if self.debug:
+                    print(
+                        "[SNIFF]",
+                        f"len={len(data)}",
+                        "head=",
+                        _hex_dump(data, 32)
+                    )
+
+                    dbg_hdr = _try_parse_f1_header(data)
+                    if dbg_hdr:
+                        print(
+                            "[SNIFF HDR]",
+                            f"fmt={dbg_hdr['packet_format']}",
+                            f"ver={dbg_hdr['game_version']}",
+                            f"pid={dbg_hdr['packet_id']}",
+                            f"frame={dbg_hdr['frame_id']}",
+                        )
+                    else:
+                        print("[SNIFF HDR] parse FAILED")
+
                 # DEBUG: zeigen ob überhaupt UDP ankommt
                 if self.debug:
                     print("RX", len(data))
@@ -1597,11 +1673,43 @@ class F1UDPListener:
         user_key = getattr(self.config, "game_profile_key", "AUTO") or "AUTO"
         pkt_fmt = int(hdr.get("packetFormat", -1))
 
-        # AUTO: pick by UDP packetFormat
+        # AUTO: pick by UDP packetFormat (primary), fallback by gameYear (secondary)
         if user_key == "AUTO":
-            for p in GAME_PROFILES.values():
-                if p.packet_format == pkt_fmt:
-                    return p
+            # 1) primary: packetFormat exact match
+            matches = [p for p in GAME_PROFILES.values() if p.packet_format == pkt_fmt]
+            if len(matches) == 1:
+                return matches[0]
+
+            # 2) secondary: gameYear fallback (helps when packetFormat is reused across years)
+            gy = hdr.get("gameYear", None)
+            try:
+                gy = int(gy) if gy is not None else None
+            except Exception:
+                gy = None
+
+            if gy is not None:
+                year_to_key = {
+                    2025: "F1_25",
+                    2024: "F1_24",
+                    2023: "F1_23",
+                    2022: "F1_22",
+                    2021: "F1_21",
+                    2020: "F1_2020",
+                    2019: "F1_2019",
+                    2018: "F1_2018",
+                    2017: "F1_2017",
+                }
+                k = year_to_key.get(gy)
+                if k and k in GAME_PROFILES:
+                    return GAME_PROFILES[k]
+
+            # 3) if ambiguous and we had packetFormat matches, prefer the "newest" one
+            if matches:
+                # higher packet_format is not helpful here (same), so prefer by name/year heuristic
+                # just return the first deterministic match (dict order) OR choose a stable key:
+                # (You can refine this later if needed)
+                return matches[0]
+
             return None
 
         # MANUAL
