@@ -18,7 +18,7 @@
   "db.refresh": "Aktualisieren",
 
   "model.deg_group": "Degradationsmodell",
-  "model.estimate_btn": "Degradation + Pitfenster schätzen",
+  "model.estimate_btn": "Degradation + Boxenstopp-Fenster schätzen",
 
   "settings.pick_folder": "Ordner wählen…",
   "settings.udp_enabled": "UDP aktiv (F1 SC/Wetter)",
