@@ -16,227 +16,9 @@ from app.config import load_config
 from app.game_profiles import GAME_PROFILES
 from app.logging_util import AppLogger
 from app.paths import cache_dir
-
-# Codemasters Team IDs (F1 25)
-TEAM_ID_TO_NAME = {
-    0: "Mercedes",
-    1: "Ferrari",
-    2: "Red Bull",
-    3: "Williams",
-    4: "Aston Martin",
-    5: "Alpine",
-    6: "RB",
-    7: "Haas",
-    8: "McLaren",
-    9: "Kick Sauber",
-    255: "UNK",
-}
-
-# ============================================================
-# DEBUG: Minimal UDP header sniffer (F1 telemetry)
-# ============================================================
-
-HDR_FMT = "<HBBBBQfIBB"  # Codemasters UDP header (24 bytes)
-HDR_SIZE = struct.calcsize(HDR_FMT)
-
-
-def _hex_dump(b: bytes, n: int = 32) -> str:
-    return " ".join(f"{x:02X}" for x in b[:n])
-
-
-def _try_parse_f1_header(data: bytes):
-    """
-    Try to parse a Codemasters F1 UDP header at offset 0.
-    Returns dict if plausible, otherwise None.
-    """
-    if len(data) < HDR_SIZE:
-        return None
-
-    try:
-        (
-            packet_format,
-            game_major,
-            game_minor,
-            packet_version,
-            packet_id,
-            session_uid,
-            session_time,
-            frame_id,
-            player_idx,
-            secondary_idx,
-        ) = struct.unpack_from(HDR_FMT, data, 0)
-    except Exception:
-        return None
-
-    # Plausibility checks (very important!)
-    if not (2017 <= packet_format <= 2030):
-        return None
-    if not (0 <= packet_id <= 20):
-        return None
-
-    return {
-        "packet_format": packet_format,
-        "game_version": f"{game_major}.{game_minor}",
-        "packet_version": packet_version,
-        "packet_id": packet_id,
-        "session_uid": session_uid,
-        "session_time": session_time,
-        "frame_id": frame_id,
-        "player_idx": player_idx,
-        "secondary_idx": secondary_idx,
-    }
-
-
-@dataclass
-class F1LiveState:
-    safety_car_status: Optional[int] = None  # 0 none, 1 SC, 2 VSC, 3 formation lap
-    weather: Optional[int] = None  # enum (best-effort)
-
-    # NEW: flags
-    track_flag: Optional[int] = None  # from marshal zones: -1/0/1/2/3
-    player_fia_flag: Optional[int] = None  # from car status:   -1/0/1/2/3
-
-    rain_now_pct: Optional[int] = None  # 0..100 (current rain)
-    rain_fc_pct: Optional[int] = None  # 0..100 (forecast next sample)
-
-    # Forecast samples: list of (time_offset_min, rain_pct, weather_enum)
-    rain_fc_series: Optional[list[tuple[int, int, int]]] = None
-
-    track_temp_c: Optional[float] = None
-    air_temp_c: Optional[float] = None
-
-    # optional: einfache Trends (aus letzten n Samples)
-    track_temp_trend_c_per_min: Optional[float] = None
-    rain_trend_pct_per_min: Optional[float] = None
-
-    # NOTE: you assign this as str in the listener; keep it consistent with DB (TEXT).
-    session_uid: Optional[str] = None
-
-    # Player meta (you already set these in _update_field_metrics_and_emit)
-    player_car_index: Optional[int] = None
-    player_tyre_cat: Optional[str] = None  # "SLICK" / "INTER" / "WET"
-
-    # NEW: exact compound label for slicks ("C1"-"C6"), otherwise same as category ("INTER"/"WET").
-    # Intended for lap DB + later strategy logic. Keep player_tyre_cat as the coarse class.
-    player_tyre_compound: Optional[str] = None
-
-    player_team_id: Optional[int] = None  # from Participants packet (pid=4)
-    player_team_name: Optional[str] = None
-
-    # NOTE: inter_share bleibt aus Kompatibilitätsgründen = Anteil (INTER+WET) von (SLICK+INTER+WET)
-    inter_share: Optional[float] = None
-    # Neue, getrennte Werte (Inter vs Wet)
-    inter_only_share: Optional[float] = None
-    wet_share: Optional[float] = None
-
-    pace_delta_inter_vs_slick_s: Optional[float] = None
-    # Neue, getrennte Pace-Deltas (Field)
-    pace_delta_wet_vs_inter_s: Optional[float] = None
-    pace_delta_wet_vs_slick_s: Optional[float] = None
-
-    # NOTE: inter_count bleibt aus Kompatibilitätsgründen = Anzahl (INTER+WET)
-    inter_count: Optional[int] = None
-    inter_only_count: Optional[int] = None
-    wet_count: Optional[int] = None
-    slick_count: Optional[int] = None
-
-    # --- Your (player) learned reference deltas ---
-    your_delta_inter_vs_slick_s: Optional[float] = None
-    your_delta_wet_vs_slick_s: Optional[float] = None
-    your_delta_wet_vs_inter_s: Optional[float] = None
-    your_ref_counts: Optional[str] = None  # z.B. "S:3 I:2 W:0"
-
-    # --- Game/profile meta (from UDP header) ---
-    packet_format: Optional[int] = None
-    game_year: Optional[int] = None
-
-    # --- Session meta (from Session packet) ---
-    track_id: Optional[int] = None
-    session_type_id: Optional[int] = None
-
-    # --- Track geometry (from Session packet) ---
-    track_length_m: Optional[int] = None
-    sector2_start_m: Optional[float] = None
-    sector3_start_m: Optional[float] = None
-
-    # --- Player lap telemetry (from LapData packet) ---
-    player_current_lap_time_ms: Optional[int] = None
-    player_last_lap_time_ms: Optional[int] = None
-    player_lap_distance_m: Optional[float] = None
-    player_sector1_time_ms: Optional[int] = None
-    player_sector2_time_ms: Optional[int] = None
-    player_pit_status: Optional[int] = None
-    player_current_lap_num: Optional[int] = None
-
-    # --- NEW (additive): fuel + tyre wear for lap database ---
-    # fuel: typically kg in Codemasters UDP
-    player_fuel_in_tank: Optional[float] = None
-    player_fuel_capacity: Optional[float] = None
-    player_fuel_remaining_laps: Optional[float] = None
-
-    # wear values stored as "remaining %" (100 = new, 0 = dead)
-    player_wear_fl: Optional[float] = None
-    player_wear_fr: Optional[float] = None
-    player_wear_rl: Optional[float] = None
-    player_wear_rr: Optional[float] = None
-
-    # --- Field meta ---
-    field_total_cars: Optional[int] = None
-    unknown_tyre_count: Optional[int] = None
-
-
-def _read_header(data: bytes):
-    """
-    Supports:
-      - F1 25 header (29 bytes): <HBBBBBQfIIBB
-      - F1 2020 header (24 bytes): <HBBBBQfIBB
-    Returns a dict with at least:
-      packetFormat, gameYear (synthetic for 2020), packetId, sessionUID, playerCarIndex, headerSize
-    """
-    if len(data) < 24:
-        return None
-
-    # Peek packetFormat (uint16 LE)
-    try:
-        (pkt_fmt,) = struct.unpack_from("<H", data, 0)
-    except Exception:
-        return None
-
-    # --- F1 25 / modern (2025) ---
-    # Header 29 bytes (includes gameYear + overallFrameIdentifier)
-    if len(data) >= 29 and pkt_fmt >= 2025:
-        try:
-            u = struct.unpack_from("<HBBBBBQfIIBB", data, 0)
-            return {
-                "packetFormat": int(u[0]),  # 2025
-                "gameYear": int(u[1]),  # 25
-                "packetId": int(u[5]),
-                "sessionUID": u[6],
-                "playerCarIndex": int(u[10]),
-                "headerSize": 29,
-            }
-        except Exception:
-            return None
-
-    # --- F1 2017..2024 legacy style (24 bytes header) ---
-    # Header 24 bytes (no gameYear, no overallFrameIdentifier)
-    if 2017 <= pkt_fmt <= 2024:
-        try:
-            u = struct.unpack_from("<HBBBBQfIBB", data, 0)
-            return {
-                "packetFormat": int(u[0]),  # 2017-2024
-                "gameYear": int(u[0]) - 2000,  # synthetic: 2022 -> 22 (matches your UI style)
-                "packetId": int(u[4]),
-                "sessionUID": u[5],
-                "playerCarIndex": int(u[8]),
-                "headerSize": 24,
-            }
-        except Exception:
-            return None
-
-    # Unknown packet format -> ignore
-    return None
-
+from app.telemetry.header import read_header, try_parse_f1_header, hex_dump
+from app.telemetry.state import F1LiveState
+from app.telemetry.utils import TEAM_ID_TO_NAME, team_name_from_id
 
 class _Debounce:
     """Only accept a value if it stays the same for N updates or T seconds."""
@@ -1476,10 +1258,10 @@ class F1UDPListener:
                         "[SNIFF]",
                         f"len={len(data)}",
                         "head=",
-                        _hex_dump(data, 32)
+                        hex_dump(data, 32)
                     )
 
-                    dbg_hdr = _try_parse_f1_header(data)
+                    dbg_hdr = try_parse_f1_header(data)
                     if dbg_hdr:
                         print(
                             "[SNIFF HDR]",
@@ -1501,7 +1283,7 @@ class F1UDPListener:
             except OSError:
                 break
 
-            hdr = _read_header(data)
+            hdr = read_header(data)
             if not hdr:
                 continue
 
@@ -1990,7 +1772,7 @@ class F1UDPReplayListener(F1UDPListener):
                     try:
                         # This is literally the same code path as LIVE, because we reuse F1UDPListener logic.
                         # We just bypass the socket.
-                        hdr2 = _read_header(payload)
+                        hdr2 = read_header(payload)
                         if not hdr2:
                             continue
                     except Exception:
@@ -2018,7 +1800,7 @@ class F1UDPReplayListener(F1UDPListener):
             pass
 
         # This is the same as the LIVE _run() body AFTER recvfrom().
-        hdr = _read_header(data)
+        hdr = read_header(data)
         if not hdr:
             return
 
