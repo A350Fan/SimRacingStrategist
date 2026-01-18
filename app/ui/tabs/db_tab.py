@@ -1,5 +1,6 @@
 # app/ui/tabs/db_tab.py
 from __future__ import annotations
+
 from PySide6 import QtWidgets
 
 
