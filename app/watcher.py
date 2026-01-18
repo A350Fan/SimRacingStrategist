@@ -1,14 +1,14 @@
 # app/watcher.py
 from __future__ import annotations
 
-import time
 import hashlib
 import shutil
+import time
 from pathlib import Path
 from typing import Callable, Optional
 
-from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 from app.paths import cache_dir
 

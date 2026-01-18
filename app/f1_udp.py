@@ -1,19 +1,21 @@
 # app/f1_udp.py
 from __future__ import annotations
+
+import datetime
 import socket
 import statistics
 import struct
 import threading
 import time
-import datetime
-from dataclasses import dataclass
-from typing import Callable, Optional
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable, Optional
+
 from app.config import load_config
 from app.game_profiles import GAME_PROFILES
-from app.paths import cache_dir
 from app.logging_util import AppLogger
+from app.paths import cache_dir
 
 # Codemasters Team IDs (F1 25)
 TEAM_ID_TO_NAME = {

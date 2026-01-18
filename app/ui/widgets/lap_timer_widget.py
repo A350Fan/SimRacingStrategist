@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+
 from PySide6 import QtCore, QtWidgets
 
 

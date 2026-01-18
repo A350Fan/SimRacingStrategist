@@ -1,35 +1,34 @@
 # app/main.py
 from __future__ import annotations
+
+import csv
+import re
+import shutil
+import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from datetime import datetime, timezone
 
 from PySide6 import QtCore, QtWidgets, QtGui
 
-# --- UI split: tab widgets ---
-from app.ui.tabs.live_raw_tab import LiveRawTabWidget
-from app.ui.tabs.live_tab import LiveTabWidget
-from app.ui.tabs.db_tab import DbTabWidget
-from app.ui.tabs.model_tab import ModelTabWidget
-from app.ui.tabs.settings_tab import SettingsTabWidget
-
 from app.config import load_config, save_config, AppConfig
-from app.watcher import FolderWatcher
-from app.overtake_csv import parse_overtake_csv, lap_summary
 from app.db import upsert_lap, latest_laps, distinct_tracks, laps_for_track, export_laps_to_csv
 from app.f1_udp import F1UDPListener, F1UDPReplayListener, F1LiveState
 from app.logging_util import AppLogger
-from app.paths import cache_dir
-from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop
-from app.rain_engine import RainEngine
-from app.translator import Translator
-from app.track_map import track_label_from_id
 from app.minisectors import MiniSectorTracker
-
-import sys
-import re
-import csv
-import shutil
+from app.overtake_csv import parse_overtake_csv, lap_summary
+from app.paths import cache_dir
+from app.rain_engine import RainEngine
+from app.strategy_model import LapRow, estimate_degradation_for_track_tyre, pit_window_one_stop, pit_windows_two_stop
+from app.track_map import track_label_from_id
+from app.translator import Translator
+from app.ui.tabs.db_tab import DbTabWidget
+# --- UI split: tab widgets ---
+from app.ui.tabs.live_raw_tab import LiveRawTabWidget
+from app.ui.tabs.live_tab import LiveTabWidget
+from app.ui.tabs.model_tab import ModelTabWidget
+from app.ui.tabs.settings_tab import SettingsTabWidget
+from app.watcher import FolderWatcher
 
 _RE_RACE = re.compile(r"(^|_)r($|_)")
 _RE_QUALI = re.compile(r"(^|_)q($|_)|(^|_)q[123]($|_)")

@@ -1,9 +1,11 @@
 # app/ui/widgets/ascii_hud_widget.py
 from __future__ import annotations
-from PySide6 import QtCore, QtGui, QtWidgets
-from app.ui.widgets.lap_timer_widget import LapTimerWidget
 
 import time
+
+from PySide6 import QtCore, QtGui, QtWidgets
+
+from app.ui.widgets.lap_timer_widget import LapTimerWidget
 
 
 def _pct(v) -> str:

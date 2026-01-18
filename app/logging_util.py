@@ -5,8 +5,8 @@ import datetime
 import logging
 from pathlib import Path
 from typing import Callable, Optional
-from .paths import app_dir
 
+from .paths import app_dir
 
 logger = logging.getLogger(__name__)
 

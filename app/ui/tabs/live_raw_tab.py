@@ -1,5 +1,6 @@
 # app/ui/tabs/live_raw_tab.py
 from __future__ import annotations
+
 from PySide6 import QtWidgets
 
 from app.ui.widgets.live_header_widget import LiveHeaderWidget

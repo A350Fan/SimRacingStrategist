@@ -1,10 +1,10 @@
 # app/strategy_model.py
 from __future__ import annotations
 
+import datetime as dt
+import math
 from dataclasses import dataclass
 from typing import List, Optional
-import math
-import datetime as dt
 
 import numpy as np
 
