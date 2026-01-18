@@ -37,7 +37,6 @@ def _stable_file(path: Path, checks: int = 5, delay: float = 0.25) -> bool:
     return False
 
 
-
 def _hash_path(path: Path) -> str:
     h = hashlib.sha1(str(path).encode("utf-8", errors="ignore")).hexdigest()
     return h[:16]
@@ -102,6 +101,7 @@ class CSVHandler(FileSystemEventHandler):
         cached = copy_to_cache(src)
         if cached:
             self.on_csv(src, cached)
+
 
 class FolderWatcher:
     def __init__(self, root: Path, on_csv: Callable[[Path, Path], None]):

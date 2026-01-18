@@ -16,18 +16,22 @@ def app_dir() -> Path:
     p.mkdir(parents=True, exist_ok=True)
     return p
 
+
 def config_path() -> Path:
     return app_dir() / "config.json"
+
 
 def cache_dir() -> Path:
     p = app_dir() / "cache"
     p.mkdir(parents=True, exist_ok=True)
     return p
 
+
 def data_dir() -> Path:
     p = app_dir() / "data"
     p.mkdir(parents=True, exist_ok=True)
     return p
+
 
 def db_path() -> Path:
     return app_dir() / "data.db"

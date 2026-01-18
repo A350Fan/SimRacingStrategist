@@ -32,9 +32,10 @@ def _median(xs: List[float]) -> Optional[float]:
 @dataclass
 class RainEngineOutput:
     advice: RainPitAdvice
-    wetness: float          # 0..1
-    confidence: float       # 0..1
+    wetness: float  # 0..1
+    confidence: float  # 0..1
     debug: str
+
 
 @dataclass(frozen=True)
 class RainPitTuning:
@@ -237,7 +238,6 @@ class RainPitTuning:
     # Wenn Wetness darunter liegt und Regen kurz ist, bleib auf Slick.
 
 
-
 class RainEngine:
     """
     Zustandsbehaftete Entscheidungslogik:
@@ -247,20 +247,20 @@ class RainEngine:
     """
 
     def __init__(
-        self,
-        window_s: float = 20.0,         # rolling window length
-        min_samples: int = 4,           # min samples before trusting much
-        on_th: float = 0.65,            # switch-to-inter threshold
-        off_th: float = 0.35,           # switch-back threshold
-        hold_on_updates: int = 2,       # require N consecutive updates for ON
-        hold_off_updates: int = 3,      # require N consecutive updates for OFF
-        # full-wet mode thresholds (Inter -> Wet)
-        wet_on_th: float = 0.78,
-        wet_off_th: float = 0.55,
-        wet_hold_on_updates: int = 2,
-        wet_hold_off_updates: int = 3,
-        lockout_laps_wet_to_inter: float = 2.0,  # prevent flip-flop after Wet -> Inter
-        lockout_laps_inter_to_wet: float = 1.0,  # prevent flip-flop after Inter -> Wet
+            self,
+            window_s: float = 20.0,  # rolling window length
+            min_samples: int = 4,  # min samples before trusting much
+            on_th: float = 0.65,  # switch-to-inter threshold
+            off_th: float = 0.35,  # switch-back threshold
+            hold_on_updates: int = 2,  # require N consecutive updates for ON
+            hold_off_updates: int = 3,  # require N consecutive updates for OFF
+            # full-wet mode thresholds (Inter -> Wet)
+            wet_on_th: float = 0.78,
+            wet_off_th: float = 0.55,
+            wet_hold_on_updates: int = 2,
+            wet_hold_off_updates: int = 3,
+            lockout_laps_wet_to_inter: float = 2.0,  # prevent flip-flop after Wet -> Inter
+            lockout_laps_inter_to_wet: float = 1.0,  # prevent flip-flop after Inter -> Wet
 
     ):
         self.window_s = float(window_s)
@@ -302,7 +302,6 @@ class RainEngine:
         self._wet_on_counter = 0
         self._wet_off_counter = 0
 
-
         # cache baseline pace (track, tyre) -> (t, median_pace)
         self._baseline_cache: dict[Tuple[str, str], Tuple[float, float]] = {}
 
@@ -335,18 +334,17 @@ class RainEngine:
             return None
         return (float(v_last) - float(v0)) / dt * 60.0
 
-
     def update(
-        self,
-        state: F1LiveState,
-        *,
-        track: str,
-        current_tyre: str,
-        laps_remaining: int,
-        pit_loss_s: float,
-        # DB rows from laps_for_track(track)
-        db_rows: Optional[list] = None,
-        your_last_lap_s: Optional[float] = None,
+            self,
+            state: F1LiveState,
+            *,
+            track: str,
+            current_tyre: str,
+            laps_remaining: int,
+            pit_loss_s: float,
+            # DB rows from laps_for_track(track)
+            db_rows: Optional[list] = None,
+            your_last_lap_s: Optional[float] = None,
     ) -> RainEngineOutput:
 
         fc_series = getattr(state, "rain_fc_series", None) or []
@@ -372,14 +370,12 @@ class RainEngine:
         self._push(self._wet_share, now, getattr(state, "wet_share", None))
         self._push(self._delta_wi, now, getattr(state, "pace_delta_wet_vs_inter_s", None))
 
-
-
         inter_share_med = _median([v for _, v in self._inter_share])
-        delta_is_med = _median([v for _, v in self._delta_is])          # I - S (sec); negative = inter faster
-        rain_next_med = _median([v for _, v in self._rain_next])        # 0..100
-        rain_now_med = _median([v for _, v in self._rain_now])          # 0..100
-        air_temp_med = _median([v for _, v in self._air_temp])          # °C
-        track_temp_med = _median([v for _, v in self._track_temp])      # °C
+        delta_is_med = _median([v for _, v in self._delta_is])  # I - S (sec); negative = inter faster
+        rain_next_med = _median([v for _, v in self._rain_next])  # 0..100
+        rain_now_med = _median([v for _, v in self._rain_now])  # 0..100
+        air_temp_med = _median([v for _, v in self._air_temp])  # °C
+        track_temp_med = _median([v for _, v in self._track_temp])  # °C
         weather_med = _median([v for _, v in self._weather])
         wet_share_med = _median([v for _, v in self._wet_share])
         delta_wi_field_med = _median([v for _, v in self._delta_wi])  # W - I (sec); negative = wet faster
@@ -400,7 +396,7 @@ class RainEngine:
             delta_wi_med = float(your_delta_wi)
 
         track_slope_cpm = self._slope_c_per_min(self._track_temp, window_s=90.0)  # °C/min
-        air_slope_cpm = self._slope_c_per_min(self._air_temp, window_s=120.0)     # °C/min
+        air_slope_cpm = self._slope_c_per_min(self._air_temp, window_s=120.0)  # °C/min
 
         # --- Forecast-derived features ---
         # We want a "next lap" horizon derived from lap time, but the UDP forecast is minute-based.
@@ -497,7 +493,6 @@ class RainEngine:
             dry_from_air = _clamp01((air_slope_cpm - 0.10) / 0.60)
             s_temp = _clamp01(wet_from_air - 0.50 * dry_from_air + 0.50)
 
-
         # s1: field share
         # start caring at ~15%, strong at ~50%
         s1 = None
@@ -526,7 +521,8 @@ class RainEngine:
         if track_temp_med is not None:
             # below ~22C slightly more slippery in drizzle, cap boost
             temp_boost = (
-        _clamp01((p.cold_track_ref_c - track_temp_med) / p.cold_track_span_c) * p.cold_track_boost_max)  # max +0.08
+                    _clamp01((
+                                         p.cold_track_ref_c - track_temp_med) / p.cold_track_span_c) * p.cold_track_boost_max)  # max +0.08
 
         # Weighted fusion (ignore missing signals gracefully)
         parts = []
@@ -892,9 +888,9 @@ class RainEngine:
                     else:
                         w_enum = int(weather_med) if weather_med is not None else None
                         track_warming = (
-                                    track_slope_cpm is not None and track_slope_cpm >= p.dry_track_warming_cpm)  # °C/min
+                                track_slope_cpm is not None and track_slope_cpm >= p.dry_track_warming_cpm)  # °C/min
                         track_warming_fast = (
-                                    track_slope_cpm is not None and track_slope_cpm >= p.dry_track_warming_fast_cpm)
+                                track_slope_cpm is not None and track_slope_cpm >= p.dry_track_warming_fast_cpm)
 
                         # Forecast dryness confirmation (prefer multi-horizon if present)
                         fc_dry = False

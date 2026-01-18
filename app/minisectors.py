@@ -7,8 +7,10 @@ from typing import Optional, List
 MINIS_PER_SECTOR = 10
 TOTAL_MINIS = 3 * MINIS_PER_SECTOR
 
+
 def _clamp(x: float, a: float, b: float) -> float:
     return a if x < a else b if x > b else x
+
 
 @dataclass
 class MiniRow:
@@ -31,6 +33,7 @@ class MiniRow:
     pb_ms: Optional[int] = None
     best_ms: Optional[int] = None  # session best (for now: same as pb; later can be "best of all cars")
 
+
 @dataclass
 class MiniSectorTracker:
     minis_per_sector: int = MINIS_PER_SECTOR
@@ -40,8 +43,8 @@ class MiniSectorTracker:
     _last_split_ms: Optional[int] = None
     _last_lap_num: Optional[int] = None
     _last_seen_lap_ms: Optional[int] = None
-    _last_split_dist_m: Optional[float] = None   # start distance of current minisector (within lap)
-    _last_seen_dist_m: Optional[float] = None    # last seen lap distance (within lap)
+    _last_split_dist_m: Optional[float] = None  # start distance of current minisector (within lap)
+    _last_seen_dist_m: Optional[float] = None  # last seen lap distance (within lap)
     _just_lapped: bool = False  # set True on lap change to avoid skipping MS01 if first tick arrives late
     _partial_split: bool = True
 
@@ -146,18 +149,18 @@ class MiniSectorTracker:
         }
 
     def sanity_check_snapshot(
-        self,
-        snap: dict,
-        *,
-        track_len_m: Optional[float],
-        sector2_start_m: Optional[float],
-        sector3_start_m: Optional[float],
-        vmin_kmh: float = 50.0,
-        vmax_kmh: float = 380.0,
-        abs_min_ms: int = 40,
-        abs_max_ms: int = 8000,
-        slack_lo: float = 0.50,
-        slack_hi: float = 1.50,
+            self,
+            snap: dict,
+            *,
+            track_len_m: Optional[float],
+            sector2_start_m: Optional[float],
+            sector3_start_m: Optional[float],
+            vmin_kmh: float = 50.0,
+            vmax_kmh: float = 380.0,
+            abs_min_ms: int = 40,
+            abs_max_ms: int = 8000,
+            slack_lo: float = 0.50,
+            slack_hi: float = 1.50,
     ) -> dict:
         """
         Per-track minisector sanity checker.

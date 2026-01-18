@@ -35,11 +35,12 @@ class StintPoint:
 @dataclass
 class DegradationEstimate:
     n_laps_used: int
-    wear_per_lap_pct: float           # positive: % remaining lost per lap
-    pace_loss_per_pct_s: float        # seconds per 1% wear remaining lost
+    wear_per_lap_pct: float  # positive: % remaining lost per lap
+    pace_loss_per_pct_s: float  # seconds per 1% wear remaining lost
     predicted_laps_to_threshold: Optional[float]  # from current wear to threshold
     notes: str
     max_stint_from_fresh_laps: Optional[float] = None
+
 
 def normalize_tyre(t: str) -> str:
     if not t:
@@ -61,13 +62,13 @@ def normalize_tyre(t: str) -> str:
     return su
 
 
-
 def _parse_dt(s: str) -> Optional[dt.datetime]:
     # created_at is sqlite datetime('now') => 'YYYY-MM-DD HH:MM:SS'
     try:
         return dt.datetime.strptime(s, "%Y-%m-%d %H:%M:%S")
     except Exception:
         return None
+
 
 # FUTURE/WIP: Helper for averaging per-corner tyre wear (FL/FR/RL/RR).
 # Currently unused in the project, but useful for future stint-quality / degradation heuristics.
@@ -145,6 +146,7 @@ def build_stints(rows: List[LapRow], max_gap_min: int = 12) -> List[List[StintPo
 
     return stints
 
+
 def mark_in_outlaps_in_points(points: list[StintPoint],
                               wear_drop_thr: float = 2.0,
                               outlier_sec: float = 2.5) -> list[dict]:
@@ -166,8 +168,8 @@ def mark_in_outlaps_in_points(points: list[StintPoint],
 
     # Wear% normally INCREASES; a big DROP indicates pit/new tyres/reset
     for i in range(1, len(points)):
-        if (w[i-1] - w[i]) > wear_drop_thr:
-            inlap[i-1] = True
+        if (w[i - 1] - w[i]) > wear_drop_thr:
+            inlap[i - 1] = True
             outlap[i] = True
 
     clean = [True] * len(points)
@@ -201,10 +203,12 @@ def mark_in_outlaps_in_points(points: list[StintPoint],
 
     return out
 
+
 def _wear_avg(l: "LapRow") -> float:
     vals = [l.wear_fl, l.wear_fr, l.wear_rl, l.wear_rr]
     vals = [v for v in vals if v is not None]
     return float(sum(vals) / len(vals)) if vals else 0.0
+
 
 def mark_in_outlaps_in_stint(laps: list["LapRow"], wear_drop_thr: float = 2.0,
                              outlier_sec: float = 2.5) -> list[dict]:
@@ -225,16 +229,16 @@ def mark_in_outlaps_in_stint(laps: list["LapRow"], wear_drop_thr: float = 2.0,
 
     # Median lap time (robust baseline)
     times = sorted([x.lap_time_s for x in laps if x.lap_time_s is not None])
-    med = times[len(times)//2] if times else None
+    med = times[len(times) // 2] if times else None
 
     inlap = [False] * len(laps)
     outlap = [False] * len(laps)
 
     # 1) Detect pit/reset via WEAR DROP (wear% should usually increase; a drop means new tyres/reset)
     for i in range(1, len(laps)):
-        if (w[i-1] - w[i]) > wear_drop_thr:
+        if (w[i - 1] - w[i]) > wear_drop_thr:
             # lap i-1 is inlap, lap i is outlap
-            inlap[i-1] = True
+            inlap[i - 1] = True
             outlap[i] = True
 
     # 2) Fallback: detect outliers by lap time (only if we have median)
@@ -270,11 +274,12 @@ def mark_in_outlaps_in_stint(laps: list["LapRow"], wear_drop_thr: float = 2.0,
         })
     return out
 
+
 def estimate_degradation_for_track_tyre(
-    rows: List[LapRow],
-    track: str,
-    tyre: str,
-    wear_threshold: float = 70.0
+        rows: List[LapRow],
+        track: str,
+        tyre: str,
+        wear_threshold: float = 70.0
 ) -> DegradationEstimate:
     # filter
     tyre_norm = normalize_tyre(tyre)
@@ -341,7 +346,7 @@ def estimate_degradation_for_track_tyre(
 
     # pace loss per 1% wear lost:
     # We model lap_time = a + b*(100 - wear_avg) so b is seconds per 1% wear lost
-    x = np.array([w for (w, t) in pace_vs_wear], dtype=float) #wear%
+    x = np.array([w for (w, t) in pace_vs_wear], dtype=float)  # wear%
     y = np.array([t for (w, t) in pace_vs_wear], dtype=float)
 
     # robust-ish: simple linear fit
@@ -363,7 +368,6 @@ def estimate_degradation_for_track_tyre(
         max_from_fresh = wear_threshold / wear_per_lap
         max_from_fresh = max(0.0, max_from_fresh)
 
-
     return DegradationEstimate(
         n_laps_used=len(pace_vs_wear),
         wear_per_lap_pct=wear_per_lap,
@@ -372,6 +376,7 @@ def estimate_degradation_for_track_tyre(
         notes=f"Built from {len(stints)} stint(s).",
         max_stint_from_fresh_laps=max_from_fresh
     )
+
 
 def pit_window_one_stop(race_laps: int, max_stint_laps: float, min_stint_laps: int = 5):
     """
@@ -390,6 +395,7 @@ def pit_window_one_stop(race_laps: int, max_stint_laps: float, min_stint_laps: i
     if earliest > latest:
         return None
     return earliest, latest
+
 
 def pit_windows_two_stop(race_laps: int, max_stint_laps: float, min_stint_laps: int = 5):
     """
@@ -435,32 +441,33 @@ def pit_windows_two_stop(race_laps: int, max_stint_laps: float, min_stint_laps: 
         return None
 
     s1_earliest = min(x[0] for x in feasible)
-    s1_latest   = max(x[0] for x in feasible)
+    s1_latest = max(x[0] for x in feasible)
     s2_earliest = min(x[1] for x in feasible)
-    s2_latest   = max(x[1] for x in feasible)
+    s2_latest = max(x[1] for x in feasible)
 
     return s1_earliest, s1_latest, s2_earliest, s2_latest
 
+
 @dataclass
 class RainPitAdvice:
-    action: str              # "BOX NOW", "BOX IN N", "STAY OUT"
+    action: str  # "BOX NOW", "BOX IN N", "STAY OUT"
     target_tyre: Optional[str]
     laps_until: Optional[int]
     reason: str
 
 
 def recommend_rain_pit(
-    current_tyre: str,
-    rain_next_pct: float,
-    laps_remaining: int,
-    pit_loss_s: float,
-    # thresholds (tunable)
-    slick_to_inter_on: float = 50.0,
-    inter_to_wet_on: float = 80.0,
-    inter_to_slick_off: float = 30.0,
-    wet_to_inter_off: float = 65.0,
-    # how many laps of "lead time" we allow before calling it
-    lead_laps: int = 2,
+        current_tyre: str,
+        rain_next_pct: float,
+        laps_remaining: int,
+        pit_loss_s: float,
+        # thresholds (tunable)
+        slick_to_inter_on: float = 50.0,
+        inter_to_wet_on: float = 80.0,
+        inter_to_slick_off: float = 30.0,
+        wet_to_inter_off: float = 65.0,
+        # how many laps of "lead time" we allow before calling it
+        lead_laps: int = 2,
 ) -> RainPitAdvice:
     """
     Pure threshold-based advice using rain_next_pct (0..100).
@@ -491,7 +498,7 @@ def recommend_rain_pit(
             # if it's already clearly coming, box now; otherwise "box in"
             if rn >= slick_to_inter_on + 10:
                 return box_now("INTER", f"Rain(next)={rn:.0f}% ≥ {slick_to_inter_on:.0f}%.")
-            return box_in(min(lead_laps, lr-1), "INTER", f"Rain(next) trending up ({rn:.0f}%).")
+            return box_in(min(lead_laps, lr - 1), "INTER", f"Rain(next) trending up ({rn:.0f}%).")
         return stay(f"Rain(next)={rn:.0f}% below Inter trigger ({slick_to_inter_on:.0f}%).")
 
     # INTERs

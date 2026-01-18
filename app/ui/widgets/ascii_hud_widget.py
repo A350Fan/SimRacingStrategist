@@ -40,6 +40,7 @@ def _speed_kmh(v) -> str:
 
 class SegmentBar(QtWidgets.QWidget):
     """ASCII-like horizontal bar using small blocks (no images)."""
+
     def __init__(self, segments: int = 10, parent=None):
         super().__init__(parent)
         self._segments = int(segments)
@@ -95,6 +96,7 @@ class SegmentBar(QtWidgets.QWidget):
 
 class MiniSectorBars(QtWidgets.QWidget):
     """S1/S2/S3 each with a 10-segment bar + delta label."""
+
     def __init__(self, parent=None):
         super().__init__(parent)
         grid = QtWidgets.QGridLayout(self)
@@ -141,6 +143,7 @@ class LiveDeltaBar(QtWidgets.QWidget):
       negative -> filled to left
       positive -> filled to right
     """
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._delta_s = None
@@ -221,6 +224,7 @@ class AsciiHudWidget(QtWidgets.QFrame):
       - Live delta (value + bar)
       - Footer (speed/gear/throttle/brake)
     """
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("asciiHud")
@@ -353,7 +357,8 @@ class AsciiHudWidget(QtWidgets.QFrame):
         sess = getattr(state, "session_type_id", None)
         weather = getattr(state, "weather", None)
         tyre = getattr(state, "player_tyre_compound", None) or getattr(state, "player_tyre_cat", None)
-        self.lapTimer.set_info_line(f"Q | {weather if weather is not None else '—'} | {tyre if tyre is not None else '—'} | C{sess if sess is not None else '—'}")
+        self.lapTimer.set_info_line(
+            f"Q | {weather if weather is not None else '—'} | {tyre if tyre is not None else '—'} | C{sess if sess is not None else '—'}")
 
         # --- Minisectors ---
         # Updated via MainWindow._update_minisector_table() -> hud.update_minisectors_from_tracker(...)
@@ -396,7 +401,8 @@ class AsciiHudWidget(QtWidgets.QFrame):
             self.deltaBar.set_delta(None)
 
         # --- Footer telemetry ---
-        speed = getattr(state, "speed", None) or getattr(state, "player_speed", None) or getattr(state, "car_speed", None)
+        speed = getattr(state, "speed", None) or getattr(state, "player_speed", None) or getattr(state, "car_speed",
+                                                                                                 None)
         gear = getattr(state, "gear", None) or getattr(state, "player_gear", None)
         thr = getattr(state, "throttle", None) or getattr(state, "accel", None) or getattr(state, "throttle_pct", None)
         brk = getattr(state, "brake", None) or getattr(state, "brake_pct", None)
@@ -540,4 +546,3 @@ class AsciiHudWidget(QtWidgets.QFrame):
             else:
                 r = rows[last_done]
                 self.miniBars.set_row(sector_idx, filled, delta_s_of(r), segment_colors=seg_colors)
-

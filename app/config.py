@@ -9,30 +9,31 @@ from app.paths import config_path
 
 @dataclass
 class AppConfig:
-    telemetry_root: str = ""     # e.g. F:\OneDrive\...\SimRacingTelemetrie
+    telemetry_root: str = ""  # e.g. F:\OneDrive\...\SimRacingTelemetrie
 
     udp_port: int = 20777
     udp_enabled: bool = True
 
     udp_record_laps: bool = False  # write UDP lap summaries into DB (parallel)
     udp_write_csv_laps: bool = False
-    udp_output_root: str = ""      # user-chosen folder for persistent data (NOT cache)
+    udp_output_root: str = ""  # user-chosen folder for persistent data (NOT cache)
 
     # Debug spam control
     udp_debug: bool = True
 
     # --- Offline testing via UDP record/replay ---
-    udp_source: str = "LIVE"          # "LIVE" or "REPLAY"
-    udp_replay_file: str = ""         # path to *.bin dump
-    udp_replay_speed: float = 1.0     # 1.0 realtime
-    udp_dump_enabled: bool = False    # if True, write raw UDP packets to a dump file
-    udp_dump_file: str = ""           # optional fixed path; if empty -> auto in output_root or cache
+    udp_source: str = "LIVE"  # "LIVE" or "REPLAY"
+    udp_replay_file: str = ""  # path to *.bin dump
+    udp_replay_speed: float = 1.0  # 1.0 realtime
+    udp_dump_enabled: bool = False  # if True, write raw UDP packets to a dump file
+    udp_dump_file: str = ""  # optional fixed path; if empty -> auto in output_root or cache
     # --------------------------------------------
 
     # UI language (lang/<code>.json). Example: "en", "de"
     language: str = "en"
 
     game_profile_key: str = "AUTO"
+
 
 def load_config() -> AppConfig:
     path = config_path()
@@ -68,6 +69,7 @@ def load_config() -> AppConfig:
         cfg = AppConfig()
         save_config(cfg)
         return cfg
+
 
 def save_config(cfg: AppConfig) -> None:
     path = config_path()

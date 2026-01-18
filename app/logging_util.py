@@ -10,8 +10,10 @@ from .paths import app_dir
 
 logger = logging.getLogger(__name__)
 
+
 def log_file_path() -> Path:
     return app_dir() / "app.log"
+
 
 class AppLogger:
     def __init__(self, ui_sink: Optional[Callable[[str], None]] = None):

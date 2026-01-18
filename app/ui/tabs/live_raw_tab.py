@@ -68,4 +68,3 @@ class LiveRawTabWidget(QtWidgets.QWidget):
             self.strategyCardsWidget.retranslate()
         except Exception:
             pass
-

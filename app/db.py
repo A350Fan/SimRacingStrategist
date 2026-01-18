@@ -1,4 +1,4 @@
-#app/db.py
+# app/db.py
 from __future__ import annotations
 
 import sqlite3
@@ -7,24 +7,38 @@ from typing import Dict, Any, List, Tuple
 from .paths import db_path
 
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS laps (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_file TEXT UNIQUE,
-    created_at TEXT DEFAULT (datetime('now')),
-    game TEXT,
-    track TEXT,
-    session TEXT,
-    session_uid TEXT,
-    weather TEXT,
-    tyre TEXT,
-    lap_time_s REAL,
-    fuel_load REAL,
-    wear_fl REAL,
-    wear_fr REAL,
-    wear_rl REAL,
-    wear_rr REAL
-);
-"""
+         CREATE TABLE IF NOT EXISTS laps
+         (
+             id
+             INTEGER
+             PRIMARY
+             KEY
+             AUTOINCREMENT,
+             source_file
+             TEXT
+             UNIQUE,
+             created_at
+             TEXT
+             DEFAULT (
+             datetime
+         (
+             'now'
+         )),
+             game TEXT,
+             track TEXT,
+             session TEXT,
+             session_uid TEXT,
+             weather TEXT,
+             tyre TEXT,
+             lap_time_s REAL,
+             fuel_load REAL,
+             wear_fl REAL,
+             wear_fr REAL,
+             wear_rl REAL,
+             wear_rr REAL
+             ); \
+         """
+
 
 def connect() -> sqlite3.Connection:
     con = sqlite3.connect(db_path())
@@ -55,22 +69,21 @@ def upsert_lap(source_file: str, summary: Dict[str, Any]) -> None:
     with con:
         con.execute(
             """
-            INSERT INTO laps (
-                source_file,
-                game,
-                track,
-                session,
-                session_uid,
-                weather,
-                tyre,
-                lap_time_s,
-                fuel_load,
-                wear_fl,
-                wear_fr,
-                wear_rl,
-                wear_rr
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
-            ON CONFLICT(source_file) DO UPDATE SET
+            INSERT INTO laps (source_file,
+                              game,
+                              track,
+                              session,
+                              session_uid,
+                              weather,
+                              tyre,
+                              lap_time_s,
+                              fuel_load,
+                              wear_fl,
+                              wear_fr,
+                              wear_rl,
+                              wear_rr)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(source_file) DO
+            UPDATE SET
                 game = excluded.game,
                 track = excluded.track,
                 session = excluded.session,
@@ -101,31 +114,22 @@ def upsert_lap(source_file: str, summary: Dict[str, Any]) -> None:
             ),
         )
 
+
 def latest_laps(limit: int = 50) -> List[Tuple]:
     con = connect()
     cur = con.execute(
         """
-        SELECT
-            created_at,
-            game,
-            track,
-            session,
-            session_uid,
-            tyre,
-            weather,
-            lap_time_s,
-            fuel_load,
-            wear_fl,
-            wear_fr,
-            wear_rl,
-            wear_rr
+        SELECT created_at,
+               game,
+               track, session, session_uid, tyre, weather, lap_time_s, fuel_load, wear_fl, wear_fr, wear_rl, wear_rr
         FROM laps
         ORDER BY id DESC
-        LIMIT ?
+            LIMIT ?
         """,
         (limit,),
     )
     return cur.fetchall()
+
 
 def export_laps_to_csv(csv_path: str) -> int:
     """
@@ -142,21 +146,9 @@ def export_laps_to_csv(csv_path: str) -> int:
     con = connect()
     cur = con.execute(
         """
-        SELECT
-            created_at,
-            game,
-            track,
-            session,
-            session_uid,
-            weather,
-            tyre,
-            lap_time_s,
-            fuel_load,
-            wear_fl,
-            wear_fr,
-            wear_rl,
-            wear_rr,
-            source_file
+        SELECT created_at,
+               game,
+               track, session, session_uid, weather, tyre, lap_time_s, fuel_load, wear_fl, wear_fr, wear_rl, wear_rr, source_file
         FROM laps
         ORDER BY id ASC
         """
@@ -204,13 +196,13 @@ def clear_laps_table() -> int:
     except Exception:
         return 0
 
+
 def lap_counts_by_track() -> List[Tuple[str, int]]:
     con = connect()
     cur = con.execute(
         """
-        SELECT
-            COALESCE(track, '') AS track,
-            COUNT(*)
+        SELECT COALESCE(track, '') AS track,
+               COUNT(*)
         FROM laps
         GROUP BY track
         ORDER BY COUNT(*) DESC
@@ -218,21 +210,21 @@ def lap_counts_by_track() -> List[Tuple[str, int]]:
     )
     return cur.fetchall()
 
+
 def laps_for_track(track: str, limit: int = 2000):
     con = connect()
     cur = con.execute(
         """
-        SELECT
-            created_at, session, track, tyre, weather,
-            lap_time_s, fuel_load, wear_fl, wear_fr, wear_rl, wear_rr
+        SELECT created_at, session, track, tyre, weather, lap_time_s, fuel_load, wear_fl, wear_fr, wear_rl, wear_rr
         FROM laps
         WHERE track = ?
         ORDER BY id ASC
-        LIMIT ?
+            LIMIT ?
         """,
         (track, limit),
     )
     return cur.fetchall()
+
 
 def distinct_tracks():
     con = connect()

@@ -1,7 +1,6 @@
 # app/track_map.py
 from __future__ import annotations
 
-
 # F1 25 trackId -> human name (partial; unknown ids fall back to TrackId:<n>)
 # Keep this dict minimal and extend it as you confirm IDs.
 TRACK_ID_TO_NAME: dict[int, str] = {
@@ -39,6 +38,7 @@ TRACK_ID_TO_NAME: dict[int, str] = {
     31: "Las Vegas",
     32: "Losail"
 }
+
 
 def track_label_from_id(track_id: int | None) -> str:
     """

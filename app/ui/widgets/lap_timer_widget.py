@@ -40,7 +40,6 @@ class LapTimerWidget(QtWidgets.QWidget):
     # Argument: completed lap time in ms.
     lapCompleted = QtCore.Signal(int)
 
-
     def __init__(self, parent=None):
         super().__init__(parent)
 

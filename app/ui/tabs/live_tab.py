@@ -23,7 +23,6 @@ class LiveTabWidget(QtWidgets.QWidget):
         # ensure updates always run on the UI thread
         self.stateReceived.connect(self.set_live_state)
 
-
         # Keep last state (optional, for future widgets)
         self._state = None
 
@@ -84,7 +83,8 @@ class LiveTabWidget(QtWidgets.QWidget):
         fc_lay.addWidget(self.lblFlagHint)
 
         # Pin top-left with alignment (row 0, col 0)
-        stage_grid.addWidget(self.flagContainer, 0, 0, alignment=QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
+        stage_grid.addWidget(self.flagContainer, 0, 0,
+                             alignment=QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignTop)
 
         # --- Main content (top-right) ---
         # This holds: LapTimer (top) + Minisectors (below).
