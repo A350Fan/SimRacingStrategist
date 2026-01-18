@@ -131,7 +131,7 @@ Legend:
 - ⏳ Track-specific preset baselines (optional)
 
 ### Weather forecast expansion
-- 🧪 Interpret "next lap" from minute-based forecast samples
+- ✅ Interpret "next lap" from minute-based forecast samples
   - map minutes → laps using estimated lap time
 
 ### Multiple OS Support

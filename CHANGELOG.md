@@ -9,15 +9,21 @@ Semantic Versioning (in an early 0.x stage).
 ## [Unreleased]
 
 ### Added
-- minisector debug dump
-- missing indices snapshot
-- next lap forecast
+- None
 
 ### Changed
 - None
 
 ### Fixed
 - None
+
+---
+## [0.3.4] - 2025-01-18
+
+### Added
+- minisector debug dump
+- missing indices snapshot
+- next lap forecast
 
 ---
 ## [0.3.3] - 2025-01-17
