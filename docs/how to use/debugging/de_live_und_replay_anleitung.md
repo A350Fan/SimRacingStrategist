@@ -1,6 +1,7 @@
 # Wechsel zwischen LIVE- und REPLAY-Modus (UDP)
 
-Diese Anleitung beschreibt, wie du in **SimRacingStrategist** zwischen **LIVE-Telemetrie** (Spiel läuft) und **REPLAY-Modus** (Offline aus Dump-Datei) wechselst.
+Diese Anleitung beschreibt, wie du in **SimRacingStrategist** zwischen **LIVE-Telemetrie** (Spiel läuft) und *
+*REPLAY-Modus** (Offline aus Dump-Datei) wechselst.
 
 ---
 
@@ -29,11 +30,13 @@ Die aktive Konfigurationsdatei liegt unter:
 ## LIVE-Modus (normales Fahren ohne Dump)
 
 ### Zweck
+
 - Normale Nutzung der App mit laufendem Spiel
 - **Keine** Aufzeichnung von UDP-Dumps
 - Empfohlen für reines Racing / Strategie-Einsatz
 
 ### Minimale Konfiguration (LIVE ohne Dump)
+
 ```json
 {
   "udp_enabled": true,
@@ -43,6 +46,7 @@ Die aktive Konfigurationsdatei liegt unter:
 ```
 
 ### Hinweise
+
 - Es wird **keine** `.bin`-Datei erzeugt
 - Verhalten entspricht dem klassischen LIVE-Betrieb vor Einführung des Replay-Systems
 - Bestehende Features (Minisektoren, Strategie, Wetter, Reifen) laufen unverändert
@@ -52,10 +56,12 @@ Die aktive Konfigurationsdatei liegt unter:
 ## LIVE-Modus (Aufzeichnen / normales Fahren)
 
 ### Zweck
+
 - Normale Nutzung mit laufendem Spiel
 - Optional: UDP-Dumps aufzeichnen
 
 ### Minimale Konfiguration (LIVE ohne Dump)
+
 ```json
 {
   "udp_enabled": true,
@@ -64,6 +70,7 @@ Die aktive Konfigurationsdatei liegt unter:
 ```
 
 ### LIVE + Dump-Aufzeichnung (empfohlen)
+
 ```json
 {
   "udp_enabled": true,
@@ -75,6 +82,7 @@ Die aktive Konfigurationsdatei liegt unter:
 ```
 
 ### Ablauf
+
 1. App starten
 2. F1-Spiel starten
 3. Fahren (Training / Quali / Rennen)
@@ -88,11 +96,13 @@ Die aktive Konfigurationsdatei liegt unter:
 ## REPLAY-Modus (Offline-Test ohne Spiel)
 
 ### Zweck
+
 - Debugging
 - Feature-Entwicklung
 - Reproduzierbare Tests ohne F1-Spiel
 
 ### Konfiguration für REPLAY
+
 ```json
 {
   "udp_enabled": true,
@@ -103,28 +113,32 @@ Die aktive Konfigurationsdatei liegt unter:
 ```
 
 ### Hinweise
+
 - Das Spiel **darf nicht laufen**
 - `udp_replay_file` muss auf eine existierende `.bin` zeigen
 - Replay-Geschwindigkeit:
-  - `1.0` = Echtzeit
-  - `2.0` = doppelte Geschwindigkeit
-  - `0.5` = halbe Geschwindigkeit
+    - `1.0` = Echtzeit
+    - `2.0` = doppelte Geschwindigkeit
+    - `0.5` = halbe Geschwindigkeit
 
 ---
 
 ## Dumps verwalten
 
 ### Umbenennen
+
 - Dumps können **jederzeit umbenannt** werden
 - Der Dateiname hat **keinen Einfluss** auf den Inhalt
 
 Beispiele:
+
 ```
 F1_25_Imola_Race_WetStart.bin
 F1_2020_Monza_Quali_MinisectionBug.bin
 ```
 
 ### Verschieben
+
 - Dumps können frei verschoben oder archiviert werden
 - Wichtig ist nur, dass `udp_replay_file` den korrekten Pfad enthält
 
@@ -133,11 +147,13 @@ F1_2020_Monza_Quali_MinisectionBug.bin
 ## Typische Fehlerquellen
 
 ### ❌ Kein Dump wird erstellt
+
 - `udp_dump_enabled` ist nicht `true`
 - falsche `config.json` editiert (nicht LocalAppData)
 - Zielordner nicht erreichbar
 
 ### ❌ Replay startet nicht
+
 - `udp_source` steht noch auf `LIVE`
 - Pfad in `udp_replay_file` ist falsch
 - Datei existiert nicht
@@ -156,12 +172,12 @@ F1_2020_Monza_Quali_MinisectionBug.bin
 
 ## Zusammenfassung
 
-| Aktion | Einstellung |
-|------|------------|
-| Live fahren | `udp_source = LIVE` |
-| Dump aufzeichnen | `udp_dump_enabled = true` |
-| Offline testen | `udp_source = REPLAY` |
-| Geschwindigkeit ändern | `udp_replay_speed` |
+| Aktion                 | Einstellung               |
+|------------------------|---------------------------|
+| Live fahren            | `udp_source = LIVE`       |
+| Dump aufzeichnen       | `udp_dump_enabled = true` |
+| Offline testen         | `udp_source = REPLAY`     |
+| Geschwindigkeit ändern | `udp_replay_speed`        |
 
 ---
 
