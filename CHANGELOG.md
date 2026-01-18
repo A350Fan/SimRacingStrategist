@@ -13,6 +13,7 @@ Semantic Versioning (in an early 0.x stage).
 
 - experimental F1 2017-F1 24 functionality
     - not all features might be working yet
+- code optimizations
 
 ### Changed
 
