@@ -21,9 +21,11 @@ Semantic Versioning (in an early 0.x stage).
 ## [0.3.4] - 2025-01-18
 
 ### Added
-- minisector debug dump
-- missing indices snapshot
-- next lap forecast
+- Debugging
+  - minisector debug dump
+  - missing indices snapshot
+- Rain Forecast
+  - next lap forecast
 
 ---
 ## [0.3.3] - 2025-01-17
