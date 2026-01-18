@@ -7,7 +7,8 @@ from app.translator import Translator
 
 
 class SettingsTabWidget(QtWidgets.QWidget):
-    def __init__(self, tr, cfg, on_pick_folder, on_pick_output_folder, on_apply_settings, on_apply_language, parent=None):
+    def __init__(self, tr, cfg, on_pick_folder, on_pick_output_folder, on_apply_settings, on_apply_language,
+                 parent=None):
         super().__init__(parent)
         self.tr = tr
         self.cfg = cfg

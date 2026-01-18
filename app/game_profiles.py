@@ -66,7 +66,6 @@ GAME_PROFILES = {
         has_minisectors=True,
     ),
 
-
     "F1_22": GameProfile(
         key="F1_22",
         name="F1 22",
@@ -79,7 +78,6 @@ GAME_PROFILES = {
         has_minisectors=True,
     ),
 
-
     "F1_21": GameProfile(
         key="F1_21",
         name="F1 2021",
@@ -91,7 +89,6 @@ GAME_PROFILES = {
         has_sector_start_distances=True,
         has_minisectors=True,
     ),
-
 
     "F1_2020": GameProfile(
         key="F1_2020",

@@ -16,11 +16,13 @@ def _parse_two_line_block(header_line: str, data_line: str) -> Dict[str, str]:
         data += [""] * (len(header) - len(data))
     return {h.strip(): d.strip() for h, d in zip(header, data)}
 
+
 class OvertakeCSVError(ValueError):
     """
     Raised when an Overtake/Iko telemetry CSV cannot be parsed.
     Includes file + block + reason for much better UI/log messages.
     """
+
     def __init__(self, path: Path, block: str, reason: str):
         self.path = Path(path)
         self.block = str(block)
@@ -35,7 +37,8 @@ def _safe_csv_row(line: str) -> list[str]:
         return []
 
 
-def _safe_parse_two_line_block(lines: list[str], header_i: int, data_i: int, *, path: Path, block: str) -> Dict[str, str]:
+def _safe_parse_two_line_block(lines: list[str], header_i: int, data_i: int, *, path: Path, block: str) -> Dict[
+    str, str]:
     """
     Try parsing a (header,data) block.
     If indices are missing -> return {} (block missing is tolerated).
@@ -58,7 +61,8 @@ def _safe_parse_two_line_block(lines: list[str], header_i: int, data_i: int, *, 
     try:
         return _parse_two_line_block(header_line, data_line)
     except Exception as e:
-        raise OvertakeCSVError(path, block, f"Malformed 2-line block at lines {header_i+1}/{data_i+1}: {type(e).__name__}: {e}")
+        raise OvertakeCSVError(path, block,
+                               f"Malformed 2-line block at lines {header_i + 1}/{data_i + 1}: {type(e).__name__}: {e}")
 
 
 def _find_telemetry_start(lines: list[str]) -> int | None:
@@ -136,6 +140,7 @@ def parse_overtake_csv(path: Path) -> Dict[str, Any]:
 
     return {"player": player, "game": game, "track": track, "setup": setup, "telemetry": df}
 
+
 def lap_summary(parsed: Dict[str, Any]) -> Dict[str, Any]:
     """Create a compact summary row for the database."""
     game = parsed.get("game") or {}
@@ -173,14 +178,14 @@ def lap_summary(parsed: Dict[str, Any]) -> Dict[str, Any]:
     # 1) Try telemetry columns (end-of-lap value)
     if isinstance(df, pd.DataFrame) and not df.empty:
         for col in (
-            "FuelInTank [kg]",
-            "Fuel in tank [kg]",
-            "FuelInTank",
-            "FuelRemaining [kg]",
-            "Fuel Remaining [kg]",
-            "FuelRemaining",
-            "Fuel [kg]",
-            "Fuel",
+                "FuelInTank [kg]",
+                "Fuel in tank [kg]",
+                "FuelInTank",
+                "FuelRemaining [kg]",
+                "Fuel Remaining [kg]",
+                "FuelRemaining",
+                "Fuel [kg]",
+                "Fuel",
         ):
             if col in df.columns:
                 try:

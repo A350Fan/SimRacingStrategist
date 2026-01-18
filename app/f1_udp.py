@@ -32,16 +32,17 @@ TEAM_ID_TO_NAME = {
     255: "UNK",
 }
 
-
 # ============================================================
 # DEBUG: Minimal UDP header sniffer (F1 telemetry)
 # ============================================================
 
-HDR_FMT = "<HBBBBQfIBB"   # Codemasters UDP header (24 bytes)
+HDR_FMT = "<HBBBBQfIBB"  # Codemasters UDP header (24 bytes)
 HDR_SIZE = struct.calcsize(HDR_FMT)
+
 
 def _hex_dump(b: bytes, n: int = 32) -> str:
     return " ".join(f"{x:02X}" for x in b[:n])
+
 
 def _try_parse_f1_header(data: bytes):
     """
