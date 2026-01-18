@@ -91,7 +91,7 @@ class F1LiveState:
     player_fuel_capacity: Optional[float] = None
     player_fuel_remaining_laps: Optional[float] = None
 
-    # wear values stored as "remaining %" (100 = new, 0 = dead)
+    # tyre wear stored as "worn %" (0 = new, 100 = fully worn/dead)
     player_wear_fl: Optional[float] = None
     player_wear_fr: Optional[float] = None
     player_wear_rl: Optional[float] = None
