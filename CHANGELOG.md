@@ -11,6 +11,7 @@ Semantic Versioning (in an early 0.x stage).
 ### Added
 - minisector debug dump
 - missing indices snapshot
+- next lap forecast
 
 ### Changed
 - None
