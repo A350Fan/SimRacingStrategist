@@ -50,20 +50,22 @@ As a result, minisector times and theoretical lap times may partially deviate fr
 **Planned fix:**  
 A solution for more accurate minisector timing is still under investigation.
 
-### KI-003 – Lap Timer might be inaccurate
+### KI-003 – Lap Timer and delta might be inaccurate
 
 **Affected version(s):** v0.1.0 - v0.3.2   
 **Affected modules:** HUD Widget Live UI
 
 **Description:**  
-60Hz limitation sends data every 16,6ms, so pause of timer might be delayed
+- 60Hz limitation sends data every 16,6ms, so pause of timer might be delayed
+- delta is completely broken at the moment
 
 **Impact:**
 
 - Lap timer is not accurate if game is paused
+- delta is delta to full lap time instead same track point
 
 **Planned fix:**  
-Solution will be investigated
+Solutions will be investigated
 
 ### KI-004 – Minisector fallback in F1 2020 is only approximate
 
