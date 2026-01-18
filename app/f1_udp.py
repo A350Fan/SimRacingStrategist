@@ -696,42 +696,110 @@ class F1UDPListener:
 
             changed = False
 
-            # ----------------------------
-            # F1 2020 LapData (1190 bytes):
-            # header 24 + 22 * 53 = 1190
-            # ----------------------------
-            if pkt_fmt == 2020:
-                car_size = 53
-                if len(data) < base + car_size * 22:
+            # ---------------------------------------------------------
+            # Legacy LapData (F1 2017..2024):
+            # header 24 + 22 * 53 bytes
+            #
+            # Key difference:
+            # - 2017..2020: last/current lap time are FLOAT seconds
+            # - 2021..2024: last/current lap time are UINT32 milliseconds
+            # ---------------------------------------------------------
+            if 2017 <= pkt_fmt <= 2024:
+                # Der sichere Weg: car_size aus Paketlänge ableiten (F1 21-24 kann von 53 abweichen)
+                remaining = len(data) - base
+                if remaining <= 0:
                     return
+
+                car_size = remaining // 22
+
+                # sanity: LapData pro Auto liegt typischerweise irgendwo um ~40-60 Bytes
+                if not (40 <= car_size <= 70):
+                    if self.debug:
+                        print(
+                            f"[LAP LEGACY] unexpected car_size={car_size} remaining={remaining} len={len(data)} base={base} fmt={pkt_fmt}")
+                    return
+
+                lap_time_is_float = (pkt_fmt <= 2020)
+
+                if self.debug:
+                    print(
+                        f"[LAP LEGACY] fmt={pkt_fmt} base={base} len={len(data)} remaining={remaining} car_size={car_size} float_times={lap_time_is_float}")
 
                 for i in range(22):
                     off = base + i * car_size
 
                     try:
-                        # F1 2020: last/current lap times are float seconds
-                        last_s = struct.unpack_from("<f", data, off + 0)[0]
-                        cur_s = struct.unpack_from("<f", data, off + 4)[0]
+                        # --- last/current lap time ---
+                        if lap_time_is_float:
+                            # 2017-2020: float seconds
+                            last_s = struct.unpack_from("<f", data, off + 0)[0]
+                            cur_s = struct.unpack_from("<f", data, off + 4)[0]
+                            last_ms = int(round(last_s * 1000.0)) if last_s and last_s > 0 else None
+                            cur_ms = int(round(cur_s * 1000.0)) if cur_s and cur_s > 0 else 0
+                        else:
+                            # 2021-2024: uint32 milliseconds
+                            last_ms_raw = struct.unpack_from("<I", data, off + 0)[0]
+                            cur_ms_raw = struct.unpack_from("<I", data, off + 4)[0]
+                            last_ms = int(last_ms_raw) if last_ms_raw > 0 else None
+                            cur_ms = int(cur_ms_raw) if cur_ms_raw > 0 else 0
+                            if self.debug and i == self._player_idx:
+                                print(f"[LAP LEGACY PLAYER] idx={i} cur_ms={cur_ms} last_ms={last_ms}")
 
                         # sector times are uint16 ms (best-effort; ok if 0)
                         s1_ms = struct.unpack_from("<H", data, off + 8)[0]
                         s2_ms = struct.unpack_from("<H", data, off + 10)[0]
 
-                        # lapDistance / totalDistance are floats (metres)
-                        lap_dist_m = struct.unpack_from("<f", data, off + 32)[0]
-                        total_dist_m = struct.unpack_from("<f", data, off + 36)[0]
+                        # ---------------------------------------------------------
+                        # Offsets variieren je nach Spiel/Jahr.
+                        # Für F1 22 scheint CarLapData bei dir 43 bytes zu sein (siehe Log).
+                        # Daher: zwei bekannte Layouts probieren und plausibel auswählen.
+                        # ---------------------------------------------------------
 
-                        # status bytes near the end
-                        lap_num = struct.unpack_from("<B", data, off + 46)[0]
-                        pit_status = struct.unpack_from("<B", data, off + 47)[0]
-                        result_status = struct.unpack_from("<B", data, off + 52)[0]
+                        def _plausible(lap_dist: float, lapn: int, pit: int, res: int) -> bool:
+                            # lap distance grob plausibel (m)
+                            if not (-500.0 <= float(lap_dist) <= 20_000.0):
+                                return False
+                            if not (0 <= int(lapn) <= 80):
+                                return False
+                            if not (0 <= int(pit) <= 2):
+                                return False
+                            if not (0 <= int(res) <= 10):
+                                return False
+                            return True
+
+                        # Layout A (kompakt, passt zu ~43B):
+                        # last(0) cur(4) s1(8) s2(10) lapDist(12) totalDist(16) scDelta(20)
+                        # carPos(24) lapNum(25) pit(26) ... resultStatus(36/37)
+                        lap_dist_A = struct.unpack_from("<f", data, off + 12)[0]
+                        total_dist_A = struct.unpack_from("<f", data, off + 16)[0]
+                        lap_num_A = struct.unpack_from("<B", data, off + 25)[0]
+                        pit_A = struct.unpack_from("<B", data, off + 26)[0]
+                        res_A = struct.unpack_from("<B", data, off + 37)[0] if (off + 37) < (off + car_size) else 0
+
+                        # Layout B (dein altes 53B-Layout):
+                        lap_dist_B = struct.unpack_from("<f", data, off + 32)[0]
+                        total_dist_B = struct.unpack_from("<f", data, off + 36)[0]
+                        lap_num_B = struct.unpack_from("<B", data, off + 46)[0]
+                        pit_B = struct.unpack_from("<B", data, off + 47)[0]
+                        res_B = struct.unpack_from("<B", data, off + 52)[0] if (off + 52) < (off + car_size) else 0
+
+                        # Wähle das plausiblere Layout
+                        if _plausible(lap_dist_A, lap_num_A, pit_A, res_A):
+                            lap_dist_m = lap_dist_A
+                            total_dist_m = total_dist_A
+                            lap_num = lap_num_A
+                            pit_status = pit_A
+                            result_status = res_A
+                        else:
+                            lap_dist_m = lap_dist_B
+                            total_dist_m = total_dist_B
+                            lap_num = lap_num_B
+                            pit_status = pit_B
+                            result_status = res_B
+
 
                     except struct.error:
                         continue
-
-                    # convert seconds -> ms
-                    last_ms = int(round(last_s * 1000.0)) if last_s and last_s > 0 else None
-                    cur_ms = int(round(cur_s * 1000.0)) if cur_s and cur_s > 0 else 0
 
                     self._pit_status[i] = int(pit_status)
                     self._result_status[i] = int(result_status)
@@ -762,7 +830,7 @@ class F1UDPListener:
                             self.state.player_current_lap_num = int(lap_num)
                             changed = True
 
-                    # last-lap handling (for deltas/history)
+                    # last-lap handling (for deltas/history) – lässt deine Logik intakt
                     if last_ms is not None and last_ms < 10_000_000:
                         prev_ms = self._last_lap_ms[i]
                         if prev_ms != last_ms:
@@ -822,7 +890,8 @@ class F1UDPListener:
 
                 if changed:
                     self._update_field_metrics_and_emit()
-                return  # IMPORTANT: stop here for 2020, don’t fall through to F1 25 parser
+
+                return  # IMPORTANT: stop here for 2017..2024, don’t fall through to F1 25 parser
 
             # ----------------------------
             # F1 25 LapData (your existing code)
@@ -1136,7 +1205,19 @@ class F1UDPListener:
             remaining = len(data) - base
 
             pkt_fmt = int(hdr.get("packetFormat", 0))
-            car_size = 60 if pkt_fmt == 2020 else 55
+
+            # Robust: car_size aus Paketlänge ableiten (2017-2024 variieren)
+            if remaining <= 0:
+                return
+
+            car_size = remaining // 22
+
+            # Plausi: CarStatus pro Auto liegt typischerweise ~50-60 Bytes (je nach Spiel)
+            if not (45 <= car_size <= 80):
+                if self.debug:
+                    print(
+                        f"[CARSTATUS] unexpected car_size={car_size} remaining={remaining} len={len(data)} base={base} fmt={pkt_fmt}")
+                return
 
             if remaining < 22 * car_size:
                 return
@@ -1172,6 +1253,9 @@ class F1UDPListener:
                         _tyre_age,
                         fia_flag,
                     ) = struct.unpack_from("<BBBBBfffHHBBHBBBb", data, off)
+
+                    if self.debug and i == int(hdr.get("playerCarIndex", 0)):
+                        print(f"[CARSTATUS PLAYER] fmt={pkt_fmt} car_size={car_size} actual={actual} visual={visual}")
 
                     self._tyre_actual[i] = int(actual)
                     self._tyre_visual[i] = int(visual)
