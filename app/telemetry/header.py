@@ -84,7 +84,7 @@ def read_header(data: bytes):
             u = struct.unpack_from("<HBBBBBQfIIBB", data, 0)
             return {
                 "packetFormat": int(u[0]),  # 2025
-                "gameYear": int(u[1]),      # 25
+                "gameYear": int(u[1]),  # 25
                 "packetId": int(u[5]),
                 "sessionUID": u[6],
                 "playerCarIndex": int(u[10]),
@@ -99,8 +99,8 @@ def read_header(data: bytes):
         try:
             u = struct.unpack_from("<HBBBBQfIBB", data, 0)
             return {
-                "packetFormat": int(u[0]),          # 2017-2024
-                "gameYear": int(u[0]) - 2000,       # synthetic: 2022 -> 22
+                "packetFormat": int(u[0]),  # 2017-2024
+                "gameYear": int(u[0]) - 2000,  # synthetic: 2022 -> 22
                 "packetId": int(u[4]),
                 "sessionUID": u[5],
                 "playerCarIndex": int(u[8]),
