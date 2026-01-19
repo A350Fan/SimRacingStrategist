@@ -10,7 +10,6 @@ Phase B (echte Auslagerung):
 import csv
 import re
 import shutil
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -37,7 +36,6 @@ from app.ui.tabs.model_tab import ModelTabWidget
 from app.ui.tabs.settings_tab import SettingsTabWidget
 
 from app.watcher import FolderWatcher
-
 
 _RE_RACE = re.compile(r"(^|_)r($|_)")
 _RE_QUALI = re.compile(r"(^|_)q($|_)|(^|_)q[123]($|_)")
@@ -2367,5 +2365,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
             self._mark_db_fail(e)
             return True
+
 
 __all__ = ["MainWindow"]
