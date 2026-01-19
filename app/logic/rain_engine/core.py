@@ -8,15 +8,14 @@ from dataclasses import dataclass
 from typing import Deque, Optional, Tuple, List
 
 from app.f1_udp import F1LiveState
-from app.strategy_model import RainPitAdvice
-
-from app.logic.rain_engine.tuning import RainPitTuning
 from app.logic.rain_engine.forecast import (
     estimate_next_lap_minute,
     fc_window_stats,
     fc_time_to_above,
     fc_time_to_below,
 )
+from app.logic.rain_engine.tuning import RainPitTuning
+from app.strategy_model import RainPitAdvice
 
 
 def _clamp01(x: float) -> float:
@@ -54,20 +53,20 @@ class RainEngine:
     """
 
     def __init__(
-        self,
-        window_s: float = 20.0,  # rolling window length
-        min_samples: int = 4,  # min samples before trusting much
-        on_th: float = 0.65,  # switch-to-inter threshold
-        off_th: float = 0.35,  # switch-back threshold
-        hold_on_updates: int = 2,  # require N consecutive updates for ON
-        hold_off_updates: int = 3,  # require N consecutive updates for OFF
-        # full-wet mode thresholds (Inter -> Wet)
-        wet_on_th: float = 0.78,
-        wet_off_th: float = 0.55,
-        wet_hold_on_updates: int = 2,
-        wet_hold_off_updates: int = 3,
-        lockout_laps_wet_to_inter: float = 2.0,  # prevent flip-flop after Wet -> Inter
-        lockout_laps_inter_to_wet: float = 1.0,  # prevent flip-flop after Inter -> Wet
+            self,
+            window_s: float = 20.0,  # rolling window length
+            min_samples: int = 4,  # min samples before trusting much
+            on_th: float = 0.65,  # switch-to-inter threshold
+            off_th: float = 0.35,  # switch-back threshold
+            hold_on_updates: int = 2,  # require N consecutive updates for ON
+            hold_off_updates: int = 3,  # require N consecutive updates for OFF
+            # full-wet mode thresholds (Inter -> Wet)
+            wet_on_th: float = 0.78,
+            wet_off_th: float = 0.55,
+            wet_hold_on_updates: int = 2,
+            wet_hold_off_updates: int = 3,
+            lockout_laps_wet_to_inter: float = 2.0,  # prevent flip-flop after Wet -> Inter
+            lockout_laps_inter_to_wet: float = 1.0,  # prevent flip-flop after Inter -> Wet
     ):
         self.window_s = float(window_s)
         self.min_samples = int(min_samples)
@@ -142,16 +141,16 @@ class RainEngine:
         return (float(v_last) - float(v0)) / dt * 60.0
 
     def update(
-        self,
-        state: F1LiveState,
-        *,
-        track: str,
-        current_tyre: str,
-        laps_remaining: int,
-        pit_loss_s: float,
-        # DB rows from laps_for_track(track)
-        db_rows: Optional[list] = None,
-        your_last_lap_s: Optional[float] = None,
+            self,
+            state: F1LiveState,
+            *,
+            track: str,
+            current_tyre: str,
+            laps_remaining: int,
+            pit_loss_s: float,
+            # DB rows from laps_for_track(track)
+            db_rows: Optional[list] = None,
+            your_last_lap_s: Optional[float] = None,
     ) -> RainEngineOutput:
 
         fc_series = getattr(state, "rain_fc_series", None) or []
@@ -497,11 +496,11 @@ class RainEngine:
                         advice = stay("On Slick: wetness not high enough for Inter yet.")
                 else:
                     if (
-                        track_rising_fast
-                        and wetness < p.slick_hold_max_wetness
-                        and (not under_sc)
-                        and laps_remaining > 3
-                        and (delta_is_med is None or delta_is_med > -0.8)
+                            track_rising_fast
+                            and wetness < p.slick_hold_max_wetness
+                            and (not under_sc)
+                            and laps_remaining > 3
+                            and (delta_is_med is None or delta_is_med > -0.8)
                     ):
                         advice = stay("Track warming again → try to stay out on slick.")
                     else:
@@ -560,13 +559,14 @@ class RainEngine:
                             advice = stay("On Wet: signals not strong enough to go back to Inter yet.")
                 else:
                     hard_dry_exit = (
-                        wetness <= 0.20
-                        and conf >= 0.58
-                        and rain_next_med is not None and rain_next_med <= 5.0
-                        and weather_med is not None and int(weather_med) <= 2
+                            wetness <= 0.20
+                            and conf >= 0.58
+                            and rain_next_med is not None and rain_next_med <= 5.0
+                            and weather_med is not None and int(weather_med) <= 2
                     )
                     if (not hard_dry_exit) and (rain_3 is not None and rain_5 is not None and rain_10 is not None):
-                        if wetness <= 0.21 and conf >= 0.60 and rain_3 <= 5 and rain_5 <= 5 and rain_10 <= 10 and int(weather_med or 9) <= 2:
+                        if wetness <= 0.21 and conf >= 0.60 and rain_3 <= 5 and rain_5 <= 5 and rain_10 <= 10 and int(
+                                weather_med or 9) <= 2:
                             hard_dry_exit = True
 
                     if hard_dry_exit:
@@ -574,7 +574,8 @@ class RainEngine:
                     else:
                         w_enum = int(weather_med) if weather_med is not None else None
                         track_warming = (track_slope_cpm is not None and track_slope_cpm >= p.dry_track_warming_cpm)
-                        track_warming_fast = (track_slope_cpm is not None and track_slope_cpm >= p.dry_track_warming_fast_cpm)
+                        track_warming_fast = (
+                                    track_slope_cpm is not None and track_slope_cpm >= p.dry_track_warming_fast_cpm)
 
                         fc_dry = False
                         if rain_3 is not None and rain_5 is not None:
@@ -583,9 +584,9 @@ class RainEngine:
                             fc_dry = (rain_next_med < 25.0)
 
                         hard_dry = (
-                            (wetness <= 0.25)
-                            and (rain_now_med is not None and rain_now_med <= 15.0)
-                            and (fc_dry or drying_soon)
+                                (wetness <= 0.25)
+                                and (rain_now_med is not None and rain_now_med <= 15.0)
+                                and (fc_dry or drying_soon)
                         )
 
                         low_inter_share = (inter_share_med is not None and inter_share_med < 0.20)
@@ -593,7 +594,8 @@ class RainEngine:
                         if (hard_dry or (not self._is_wet_mode)) and not (w_enum is not None and w_enum >= 3):
                             if fc_dry and (track_warming or drying_soon) and wetness < 0.60 and low_inter_share:
                                 n = 1
-                                advice = box_in(n, "C4", "Drying confirmed: forecast low + track warming + low I/W share.")
+                                advice = box_in(n, "C4",
+                                                "Drying confirmed: forecast low + track warming + low I/W share.")
                             elif fc_dry and wetness < 0.72 and (track_warming_fast or low_inter_share):
                                 n = 1 if under_sc else 2
                                 advice = box_in(n, "C4", "Drying trend: slick soon (moderate confidence).")
@@ -625,9 +627,9 @@ class RainEngine:
                 emergency = False
                 try:
                     emergency = (
-                        (delta_wi_med is not None and abs(float(delta_wi_med)) >= 0.90)
-                        or wet_score >= 0.97
-                        or wet_score <= 0.25
+                            (delta_wi_med is not None and abs(float(delta_wi_med)) >= 0.90)
+                            or wet_score >= 0.97
+                            or wet_score <= 0.25
                     )
                 except Exception:
                     emergency = False

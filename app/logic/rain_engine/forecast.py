@@ -6,13 +6,13 @@ from typing import Optional
 
 
 def estimate_next_lap_minute(
-    *,
-    your_last_lap_s: Optional[float],
-    default_lap_s: float = 90.0,
-    margin_s: float = 10.0,
-    min_seconds: float = 30.0,
-    min_minute: int = 1,
-    max_minute: int = 240,
+        *,
+        your_last_lap_s: Optional[float],
+        default_lap_s: float = 90.0,
+        margin_s: float = 10.0,
+        min_seconds: float = 30.0,
+        min_minute: int = 1,
+        max_minute: int = 240,
 ) -> int:
     """
     Mappe "next lap" von Sekunden -> Forecast-Minuten-Samples (UDP ist minutenbasiert).
