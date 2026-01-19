@@ -5,6 +5,9 @@ import datetime
 import socket
 import statistics
 import struct
+
+from app.telemetry.dump import UDPPacketDumpWriter, iter_udp_dump
+
 import threading
 import time
 from collections import deque
@@ -133,47 +136,10 @@ class F1UDPListener:
 
         self._lap_flag = ["OK"] * 22
 
-        # --- NEW: UDP raw dump (for offline replay) ---
-        self._dump_fp = None
-        self._dump_path = None
-        self._dump_err_logged = False  # avoid log spam on repeated write errors
-        _log = AppLogger()
-
-        try:
-            cfg = self.config
-            if bool(getattr(cfg, "udp_dump_enabled", False)):
-                dump_file = str(getattr(cfg, "udp_dump_file", "") or "").strip()
-
-                if dump_file:
-                    p = Path(dump_file)
-                else:
-                    # auto path: prefer udp_output_root, else cache
-                    root = str(getattr(cfg, "udp_output_root", "") or "").strip()
-                    out_dir = Path(root) if root else cache_dir()
-                    out_dir.mkdir(parents=True, exist_ok=True)
-
-                    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    p = out_dir / f"udp_dump_{ts}.bin"
-
-                # ensure parent exists if user provided a custom file path
-                try:
-                    p.parent.mkdir(parents=True, exist_ok=True)
-                except Exception:
-                    pass
-
-                self._dump_path = p
-                self._dump_fp = p.open("ab")  # append
-
-                # GUI apps often don't show print() -> log to app.log too
-                _log.info(f"UDP dump enabled -> {str(p)}")
-                if self.debug:
-                    print(f"[DUMP] Writing UDP dump to: {str(p)}")
-
-        except Exception as e:
-            self._dump_fp = None
-            self._dump_path = None
-            _log.error(f"UDP dump init failed: {type(e).__name__}: {e}")
-        # ---------------------------------------------
+        # --- UDP raw dump (for offline replay) ---
+        # Ausgelagert nach app/telemetry/dump.py
+        self._dump_writer = UDPPacketDumpWriter.from_config(self.config, debug=self.debug)
+        # -----------------------------------------
 
     def start(self):
         self._stop.clear()
@@ -185,15 +151,14 @@ class F1UDPListener:
         if self._thread:
             self._thread.join(timeout=1)
 
-        # --- NEW: close dump file ---
+        # --- close dump writer ---
         try:
-            if self._dump_fp:
-                self._dump_fp.flush()
-                self._dump_fp.close()
+            if getattr(self, "_dump_writer", None):
+                self._dump_writer.close()
         except Exception:
             pass
-        self._dump_fp = None
-        # ----------------------------
+        self._dump_writer = None
+        # -------------------------
 
     # -----------------------------
     # Data Health public API
@@ -291,18 +256,13 @@ class F1UDPListener:
                     pass
                 # ---------------------------------------
 
-                # --- write raw packet to dump file (t_rel_ms + len + payload) ---
+                # --- write raw packet to dump writer ---
                 try:
-                    if self._dump_fp:
-                        t_ms = int(time.monotonic() * 1000)
-                        self._dump_fp.write(struct.pack("<QI", t_ms, len(data)))
-                        self._dump_fp.write(data)
-                except Exception as e:
-                    if not getattr(self, "_dump_err_logged", False):
-                        self._dump_err_logged = True
-                        AppLogger().error(f"UDP dump write failed: {type(e).__name__}: {e}")
-
-                # ---------------------------------------------------------------
+                    if getattr(self, "_dump_writer", None):
+                        self._dump_writer.write_packet(data)
+                except Exception:
+                    pass
+                # --------------------------------------
 
                 # ========================================================
                 # DEBUG: RAW UDP HEADER SNIFFER (before any parsing!)
@@ -792,18 +752,11 @@ class F1UDPReplayListener(F1UDPListener):
             print(f"[REPLAY] Playing: {self.replay_file} @ speed={self.speed}x")
 
         try:
-            with p.open("rb") as f:
                 first_t = None
                 wall_t0 = time.monotonic()
 
-                while not self._stop.is_set():
-                    hdr = f.read(12)
-                    if len(hdr) < 12:
-                        break
-
-                    t_ms, n = struct.unpack("<QI", hdr)
-                    payload = f.read(int(n))
-                    if len(payload) < int(n):
+                for t_ms, payload in iter_udp_dump(self.replay_file):
+                    if self._stop.is_set():
                         break
 
                     if first_t is None:
