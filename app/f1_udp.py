@@ -1,13 +1,8 @@
 # app/f1_udp.py
 from __future__ import annotations
 
-import datetime
 import socket
 import statistics
-import struct
-
-from app.telemetry.dump import UDPPacketDumpWriter, iter_udp_dump
-
 import threading
 import time
 from collections import deque
@@ -16,8 +11,7 @@ from typing import Callable, Optional
 
 from app.config import load_config
 from app.game_profiles import GAME_PROFILES
-from app.logging_util import AppLogger
-from app.paths import cache_dir
+from app.telemetry.dump import UDPPacketDumpWriter, iter_udp_dump
 from app.telemetry.header import read_header, try_parse_f1_header, hex_dump
 from app.telemetry.packets.car_damage import handle_car_damage_packet
 from app.telemetry.packets.car_status import handle_car_status_packet
@@ -752,43 +746,43 @@ class F1UDPReplayListener(F1UDPListener):
             print(f"[REPLAY] Playing: {self.replay_file} @ speed={self.speed}x")
 
         try:
-                first_t = None
-                wall_t0 = time.monotonic()
+            first_t = None
+            wall_t0 = time.monotonic()
 
-                for t_ms, payload in iter_udp_dump(self.replay_file):
-                    if self._stop.is_set():
-                        break
+            for t_ms, payload in iter_udp_dump(self.replay_file):
+                if self._stop.is_set():
+                    break
 
-                    if first_t is None:
-                        first_t = int(t_ms)
-                        wall_t0 = time.monotonic()
+                if first_t is None:
+                    first_t = int(t_ms)
+                    wall_t0 = time.monotonic()
 
-                    # timing: replay relative gaps, scaled by speed
-                    try:
-                        rel_s = (int(t_ms) - int(first_t)) / 1000.0
-                        target = wall_t0 + (rel_s / self.speed)
-                        while not self._stop.is_set():
-                            now = time.monotonic()
-                            if now >= target:
-                                break
-                            time.sleep(min(0.01, target - now))
-                    except Exception:
-                        pass
+                # timing: replay relative gaps, scaled by speed
+                try:
+                    rel_s = (int(t_ms) - int(first_t)) / 1000.0
+                    target = wall_t0 + (rel_s / self.speed)
+                    while not self._stop.is_set():
+                        now = time.monotonic()
+                        if now >= target:
+                            break
+                        time.sleep(min(0.01, target - now))
+                except Exception:
+                    pass
 
-                    # feed packet into the normal parser path
-                    try:
-                        # This is literally the same code path as LIVE, because we reuse F1UDPListener logic.
-                        # We just bypass the socket.
-                        hdr2 = read_header(payload)
-                        if not hdr2:
-                            continue
-                    except Exception:
+                # feed packet into the normal parser path
+                try:
+                    # This is literally the same code path as LIVE, because we reuse F1UDPListener logic.
+                    # We just bypass the socket.
+                    hdr2 = read_header(payload)
+                    if not hdr2:
                         continue
+                except Exception:
+                    continue
 
-                    # We don't want to duplicate the entire live loop body here.
-                    # Trick: temporarily emulate the minimal part the live loop would do:
-                    # call the same parsing logic by copying the live logic entrypoint.
-                    self._process_one_payload(payload)
+                # We don't want to duplicate the entire live loop body here.
+                # Trick: temporarily emulate the minimal part the live loop would do:
+                # call the same parsing logic by copying the live logic entrypoint.
+                self._process_one_payload(payload)
 
         except Exception as e:
             if self.debug:
