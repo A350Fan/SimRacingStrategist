@@ -20,7 +20,7 @@ from app.config import load_config, save_config, AppConfig
 from app.db import upsert_lap, latest_laps, distinct_tracks, laps_for_track, export_laps_to_csv
 from app.f1_udp import F1UDPListener, F1UDPReplayListener, F1LiveState
 from app.logging_util import AppLogger
-from app.minisectors import MiniSectorTracker
+from app.logic.minisectors import MiniSectorTracker
 from app.overtake_csv import parse_overtake_csv, lap_summary
 from app.paths import cache_dir
 from app.rain_engine import RainEngine
