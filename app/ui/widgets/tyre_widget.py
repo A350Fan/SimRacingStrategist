@@ -1,26 +1,3 @@
-#  Copyright (c) 2025-2026 A350Fan
-#
-#  All rights reserved.
-#
-#  This project is provided as source-available software.
-#
-#  You are permitted to:
-#  - View and study the source code
-#  - Modify the code for personal or educational use
-#
-#  Under the following conditions:
-#  1. Any modified version must clearly attribute the original author
-#     (A350Fan) and link to the original repository.
-#  2. Modified versions may NOT be published, released, or distributed
-#     as a standalone project or product.
-#  3. This project, or any derivative work based on it, may NOT be sold,
-#     sublicensed, or monetized, including but not limited to paid releases
-#     or commercial redistribution.
-#
-#  Donations to the original author are explicitly permitted.
-#
-#  This software is provided "as is", without warranty of any kind.
-
 # app/ui/widgets/tyre_widget.py
 from __future__ import annotations
 
