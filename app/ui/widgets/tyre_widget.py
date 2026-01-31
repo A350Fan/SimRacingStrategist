@@ -36,14 +36,16 @@ VISUAL_TO_LETTER = {
     8: "W",  # Wet
 }
 
-LETTER_TO_BG = {
+# Colors are based on the *role* (Soft/Medium/Hard/Inter/Wet), not on the C-number itself.
+ROLE_TO_BG = {
     "S": "#E10600",  # red
     "M": "#FFD200",  # yellow
     "H": "#F5F5F5",  # white
     "I": "#00A650",  # green
     "W": "#0072CE",  # blue
+    "?": "#444444",  # fallback
 }
-LETTER_TO_FG = {"S": "#FFFFFF", "M": "#111111", "H": "#111111", "I": "#FFFFFF", "W": "#FFFFFF"}
+ROLE_TO_FG = {"S": "#FFFFFF", "M": "#111111", "H": "#111111", "I": "#FFFFFF", "W": "#FFFFFF", "?": "#FFFFFF"}
 
 
 class TyreWidget(QtWidgets.QFrame):
@@ -101,10 +103,11 @@ class TyreWidget(QtWidgets.QFrame):
 
         self._apply_pill("?")
 
-    def _apply_pill(self, letter: str) -> None:
-        bg = LETTER_TO_BG.get(letter, "#444444")
-        fg = LETTER_TO_FG.get(letter, "#FFFFFF")
-        self.lblPill.setText(letter)
+    def _apply_pill(self, text: str, role: str = "?") -> None:
+        """Set pill text + background based on the tyre *role* (S/M/H/I/W)."""
+        bg = ROLE_TO_BG.get(role, ROLE_TO_BG["?"])
+        fg = ROLE_TO_FG.get(role, ROLE_TO_FG["?"])
+        self.lblPill.setText(text)
         self.lblPill.setStyleSheet(f"background:{bg}; color:{fg};")
 
     @staticmethod
@@ -115,12 +118,61 @@ class TyreWidget(QtWidgets.QFrame):
             return "—"
 
     def update_from_state(self, state: object) -> None:
-        # Reifentyp (visual compound -> S/M/H/I/W)
-        v = getattr(state, "player_tyre_visual", None)
-        letter = VISUAL_TO_LETTER.get(int(v), "?") if v is not None else "?"
-        self._apply_pill(letter)
+        # -------------------------
+        # Tyre label + color logic
+        # -------------------------
+        # Goal:
+        # - Slicks: show C0..C6 (e.g. "C4"), but color it by the weekend role (Soft/Medium/Hard).
+        # - Inter/Wet: show I/W like before.
+        tyre_cat = (getattr(state, "player_tyre_cat", None) or "").upper().strip()
+        compound_label = (getattr(state, "player_tyre_compound", None) or "").upper().strip()
 
-        # Wear (kommt bei dir aus CarDamage -> state.player_wear_..)
+        role = "?"
+        pill_text = "?"
+
+        if tyre_cat in ("INTER", "WET"):
+            pill_text = "I" if tyre_cat == "INTER" else "W"
+            role = pill_text
+
+        elif tyre_cat == "SLICK":
+            if compound_label.startswith("C"):
+                pill_text = compound_label
+
+                # Preferred: weekend mapping inferred in the UDP listener
+                slick_role_map = getattr(state, "slick_role_map", None) or {}
+                role = slick_role_map.get(compound_label, "?")
+
+                # Fallback (until role map is known): use visual S/M/H for color.
+                if role not in ("S", "M", "H"):
+                    v = getattr(state, "player_tyre_visual", None)
+                    try:
+                        role = VISUAL_TO_LETTER.get(int(v), "?")
+                    except Exception:
+                        role = "?"
+            else:
+                # No C# info yet -> fallback to visual S/M/H
+                v = getattr(state, "player_tyre_visual", None)
+                try:
+                    role = VISUAL_TO_LETTER.get(int(v), "?")
+                except Exception:
+                    role = "?"
+                pill_text = role if role in ("S", "M", "H") else "?"
+
+        else:
+            # Unknown -> best-effort
+            v = getattr(state, "player_tyre_visual", None)
+            try:
+                role = VISUAL_TO_LETTER.get(int(v), "?")
+                pill_text = role
+            except Exception:
+                role = "?"
+                pill_text = "?"
+
+        self._apply_pill(pill_text, role)
+
+        # -------------------------
+        # Wear (CarDamage -> state.player_wear_..)
+        # -------------------------
         fl = getattr(state, "player_wear_fl", None)
         fr = getattr(state, "player_wear_fr", None)
         rl = getattr(state, "player_wear_rl", None)

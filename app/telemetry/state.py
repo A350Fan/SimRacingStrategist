@@ -42,6 +42,12 @@ class F1LiveState:
     player_tyre_visual: Optional[int] = None
     player_tyre_actual: Optional[int] = None
 
+    # Weekend mapping for slicks: which C-compounds are Soft/Medium/Hard on this track.
+    # Example: {"C4":"S","C3":"M","C2":"H"} (values are S/M/H/?)
+    slick_role_map: Optional[dict[str, str]] = None
+    # Human-readable list of seen compounds (debug/UI optional), e.g. "C5, C4, C3"
+    weekend_slick_compounds: Optional[str] = None
+
     player_team_id: Optional[int] = None  # from Participants packet (pid=4)
     player_team_name: Optional[str] = None
 

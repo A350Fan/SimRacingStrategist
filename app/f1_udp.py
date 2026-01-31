@@ -101,6 +101,17 @@ class F1UDPListener:
         self._tyre_actual = [None] * 22
         self._tyre_visual = [None] * 22
 
+        # --- Weekend slick compound mapping (C0..C6 -> Soft/Medium/Hard) ---
+        # F1 uses three dry compounds per weekend, but which ones (e.g. C3/C4/C5)
+        # varies by track. The UDP gives us the *actual* compound ID (C0..C6).
+        # We infer the weekend's Soft/Medium/Hard assignment by collecting the
+        # unique slick compounds we see (player + AI) and then:
+        #   soft  = softest of the set
+        #   hard  = hardest of the set
+        #   medium = the remaining one (or median if >3 are seen)
+        self._slick_seen_actual: set[int] = set()
+        self._slick_role_map: dict[str, str] = {}  # e.g. {"C4":"S","C3":"M","C2":"H"}
+
         # --- Lap quality ---
         self._ignore_next_lap = [False] * 22  # True => nächste LapTime wird verworfen (Outlap nach Reifenwechsel)
         self._last_tyre_cat = [None] * 22  # Merken, ob Reifenklasse gewechselt hat
@@ -601,59 +612,117 @@ class F1UDPListener:
 
         return profile
 
+    @staticmethod
+    def _actual_to_c_label(actual: int | None, packet_format: int) -> str | None:
+        """
+        Map Codemasters *actual* compound IDs to a 'C#' label (best-effort).
+
+        F1 25 (per UDP spec):
+            16=C5, 17=C4, 18=C3, 19=C2, 20=C1, 21=C0, 22=C6, 7=Inter, 8=Wet
+        Older games sometimes used 0..5 or 16..21 for C1..C6.
+        """
+        if actual is None:
+            return None
+        try:
+            a = int(actual)
+        except Exception:
+            return None
+
+        # F1 25+ mapping (explicit C0..C6 range)
+        if packet_format >= 2025:
+            a_to_c = {16: "C5", 17: "C4", 18: "C3", 19: "C2", 20: "C1", 21: "C0", 22: "C6"}
+            return a_to_c.get(a)
+
+        # Legacy best-effort mappings
+        if 16 <= a <= 21:
+            return f"C{a - 15}"  # 16->C1 ... 21->C6
+        if 0 <= a <= 5:
+            return f"C{a + 1}"  # 0->C1 ... 5->C6
+
+        return None
+
+    @staticmethod
+    def _c_softness_key(c_label: str) -> int:
+        """Higher = softer. (C6 softest ... C0 hardest)"""
+        try:
+            return int(c_label[1:])
+        except Exception:
+            return -999
+
+    def _maybe_update_weekend_slick_roles(self, c_label: str) -> None:
+        """
+        Collect seen slick compounds and infer S/M/H roles for THIS weekend/track.
+
+        Logic:
+        - Keep unique C-labels we observed (player + AI).
+        - Once we have >= 3 uniques:
+            Soft  = softest (highest C#)
+            Hard  = hardest (lowest C#)
+            Medium = median (works even if >3 are seen)
+        """
+        if not c_label or not c_label.startswith("C"):
+            return
+
+        # remember this compound (as label)
+        if c_label not in self._slick_role_map:
+            self._slick_role_map[c_label] = "?"
+
+        labels = set(self._slick_role_map.keys())
+
+        if len(labels) < 3:
+            # not enough info yet (common early in a session)
+            self.state.slick_role_map = dict(self._slick_role_map)
+            self.state.weekend_slick_compounds = ", ".join(sorted(labels, key=self._c_softness_key, reverse=True))
+            return
+
+        ordered = sorted(labels, key=self._c_softness_key, reverse=True)
+        soft = ordered[0]
+        hard = ordered[-1]
+        mid = ordered[len(ordered) // 2]
+
+        role_map = {lb: "?" for lb in labels}
+        role_map[soft] = "S"
+        role_map[mid] = "M"
+        role_map[hard] = "H"
+
+        self._slick_role_map = role_map
+
+        # expose for UI
+        self.state.slick_role_map = dict(role_map)
+        self.state.weekend_slick_compounds = ", ".join(sorted(labels, key=self._c_softness_key, reverse=True))
+
     def _compound_label(self, *, actual: int | None, visual: int | None, tyre_cat: str) -> str:
-        """Return exact tyre label for DB.
+        """
+        Return exact tyre label for DB + UI.
 
         - For INTER/WET: returns "INTER"/"WET".
-        - For slicks: tries to map to "C1"-"C6" using known Codemasters codes.
+        - For slicks: maps the *actual* compound to "C0".."C6" (best-effort).
           Falls back to "SLICK" if unknown.
 
-        NOTE: We keep player_tyre_cat as coarse class (SLICK/INTER/WET) for rain logic.
+        NOTE:
+        - player_tyre_cat stays coarse (SLICK/INTER/WET) for rain logic.
+        - player_tyre_compound becomes the precise label (C#) for slicks.
         """
         cat = (tyre_cat or "").upper().strip()
         if cat in ("INTER", "WET"):
             return cat
 
-        # prefer visual code (what the UI shows) when it looks like a slick compound
-        code = None
-        try:
-            v = int(visual) if visual is not None else None
-            if v is not None:
-                code = v
-        except Exception:
-            code = None
-
-        if code is None:
-            try:
-                code = int(actual) if actual is not None else None
-            except Exception:
-                code = None
-
-        # Common patterns across recent F1 UDP specs:
-        # - 16..21 => slick compounds (we map 16->C1, ..., 21->C6)
-        # - 0..5   => sometimes used in older profiles (map 0->C1, ..., 5->C6)
+        # Slicks: prefer the *actual* compound (visual is only S/M/H in the HUD)
         try:
             pf = int(getattr(self.state, "packet_format", 0) or 0)
-
-            c = int(code) if code is not None else None
-            if c is not None and 16 <= c <= 21:
-                # F1 25: observed mapping appears inverted (e.g. code 16 == C6)
-                if pf >= 2025:
-                    return f"C{22 - c}"  # 16->C6 ... 21->C1
-                else:
-                    return f"C{c - 15}"  # legacy: 16->C1 ... 21->C6
-
-            if c is not None and 0 <= c <= 5:
-                # Older range; keep legacy unless you confirm it's inverted there too
-                if pf >= 2025:
-                    return f"C{6 - c}"  # 0->C6 ... 5->C1
-                else:
-                    return f"C{c + 1}"  # 0->C1 ... 5->C6
         except Exception:
-            pass
+            pf = 0
+
+        c_label = self._actual_to_c_label(actual, pf)
+        if c_label:
+            # Keep weekend mapping up-to-date (so UI can color C# as S/M/H correctly)
+            try:
+                self._maybe_update_weekend_slick_roles(c_label)
+            except Exception:
+                pass
+            return c_label
 
         return "SLICK"
-
 
 # FUTURE/WIP: Robust parser for "rain next" extraction from Session packets without fixed offsets.
 # Currently unused (not wired into the live pipeline), but kept as a fallback strategy if offsets change
