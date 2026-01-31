@@ -31,6 +31,7 @@ Thumbs.db
 index.html
 Tree.txt
 Screenshot*
+*.zip
 
 # Default ignored files
 /shelf/
