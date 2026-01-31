@@ -7,7 +7,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class RainPitTuning:
     """
-    Parameter-/Tuning-Container fuer RainEngine.
+    Parameter-/Tuning-Container für RainEngine.
     Bewusst "frozen", damit du nicht aus Versehen zur Laufzeit Werte mutierst.
     """
 
