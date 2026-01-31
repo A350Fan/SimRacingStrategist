@@ -35,28 +35,29 @@ def handle_car_damage_packet(self, hdr, data: bytes) -> None:
 
         def _to_wear_pct(x: float) -> Optional[float]:
             """
-            Return tyre wear in percent:
+            Return tyre wear in percent (0..100):
             0 = new, 100 = fully worn.
 
-            Some games/packets may deliver 0..1; we normalize to 0..100 in that case.
+            F1 25 CarDamage.m_tyresWear is already a percentage float (0..100).
+            IMPORTANT:
+            - Do NOT auto-scale 0..1 -> 0..100, because fresh tyres can legitimately be < 1.0 (%),
+              e.g. 0.3 means 0.3% wear, not 30%.
             """
             try:
                 xv = float(x)
             except Exception:
                 return None
 
-            # normalize 0..1 -> 0..100 (defensive)
-            if 0.0 <= xv <= 1.0:
-                xv *= 100.0
-
+            # Defensive sanity: ignore clearly invalid values
             if xv < 0.0 or xv > 100.0:
                 return None
 
-            # clamp (defensive)
+            # Clamp just in case of tiny float noise (e.g. -0.0001 / 100.0001)
             if xv < 0.0:
                 xv = 0.0
             if xv > 100.0:
                 xv = 100.0
+
             return xv
 
         p1 = _to_wear_pct(w1)
