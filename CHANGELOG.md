@@ -15,6 +15,7 @@ Semantic Versioning (in an early 0.x stage).
     - not all features might be working yet
 - code optimizations
 - outsourced some stuff
+- tyre choice and wear widget
 
 ### Changed
 
