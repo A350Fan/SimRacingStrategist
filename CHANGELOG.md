@@ -11,11 +11,7 @@ Semantic Versioning (in an early 0.x stage).
 
 ### Added
 
-- experimental F1 2017-F1 24 functionality
-    - not all features might be working yet
-- code optimizations
-- outsourced some stuff
-- tyre choice and wear widget
+- None
 
 ### Changed
 
@@ -24,6 +20,18 @@ Semantic Versioning (in an early 0.x stage).
 ### Fixed
 
 - None
+
+---
+
+## [0.3.5] - 2025-01-31
+
+### Added
+
+- experimental F1 2017-F1 24 functionality
+    - not all features might be working yet
+- code optimizations
+- outsourced some stuff
+- tyre choice and wear widget
 
 ---
 
