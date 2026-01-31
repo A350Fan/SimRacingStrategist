@@ -28,13 +28,12 @@ from typing import Optional
 
 from PySide6 import QtCore, QtWidgets
 
-
 VISUAL_TO_LETTER = {
     16: "S",  # Soft
     17: "M",  # Medium
     18: "H",  # Hard
-     7: "I",  # Inter
-     8: "W",  # Wet
+    7: "I",  # Inter
+    8: "W",  # Wet
 }
 
 LETTER_TO_BG = {

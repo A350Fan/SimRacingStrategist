@@ -8,7 +8,6 @@ from app.ui.widgets.flag_widget import FlagWidget
 from app.ui.widgets.tyre_widget import TyreWidget
 
 
-
 class LiveTabWidget(QtWidgets.QWidget):
     """
     Live (GUI) Tab - new compact UI (WIP).

@@ -55,7 +55,8 @@ A solution for more accurate minisector timing is still under investigation.
 **Affected version(s):** v0.1.0 - v0.3.2   
 **Affected modules:** HUD Widget Live UI
 
-**Description:**  
+**Description:**
+
 - 60Hz limitation sends data every 16,6ms, so pause of timer might be delayed
 - delta is completely broken at the moment
 
