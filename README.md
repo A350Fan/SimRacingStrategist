@@ -1,4 +1,4 @@
-# SimRaceStrategist (Early Prototype)
+# SimRacingStrategist (Early Prototype)
 
 SimRaceStrategist is an early-stage racing strategy tool for the F1 games.
 It combines historical telemetry data (CSV) with live UDP information
