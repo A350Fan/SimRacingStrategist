@@ -5,6 +5,8 @@ from PySide6 import QtCore, QtWidgets, QtGui
 
 from app.ui.widgets.ascii_hud_widget import AsciiHudWidget
 from app.ui.widgets.flag_widget import FlagWidget
+from app.ui.widgets.tyre_widget import TyreWidget
+
 
 
 class LiveTabWidget(QtWidgets.QWidget):
@@ -101,6 +103,11 @@ class LiveTabWidget(QtWidgets.QWidget):
         content_lay.setContentsMargins(6, 0, 0, 0)
         content_lay.setSpacing(10)
 
+        # --- Tyre HUD (S/M/H/I/W + wear) ---
+        # Sits above the ASCII HUD so you immediately see compound + wear.
+        self.tyreHud = TyreWidget(self.content)
+        content_lay.addWidget(self.tyreHud, 0)
+
         # ASCII-like HUD (compact, boxed, monospace)
         self.hud = AsciiHudWidget(self.content)
         content_lay.addWidget(self.hud, 1)
@@ -156,6 +163,12 @@ class LiveTabWidget(QtWidgets.QWidget):
         # Feed ASCII HUD (includes lap timer, minisectors, delta bar, footer)
         try:
             self.hud.feed_state(state)
+        except Exception:
+            pass
+
+        # NEW: Tyre HUD (compound letter + wear)
+        try:
+            self.tyreHud.update_from_state(state)
         except Exception:
             pass
 

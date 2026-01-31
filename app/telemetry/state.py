@@ -33,9 +33,14 @@ class F1LiveState:
     player_car_index: Optional[int] = None
     player_tyre_cat: Optional[str] = None  # "SLICK" / "INTER" / "WET"
 
-    # NEW: exact compound label for slicks ("C1"-"C6"), otherwise same as category ("INTER"/"WET").
+    # exact compound label for slicks ("C1"-"C6"), otherwise same as category ("INTER"/"WET").
     # Intended for lap DB + later strategy logic. Keep player_tyre_cat as the coarse class.
     player_tyre_compound: Optional[str] = None
+
+    # for HUD: raw tyre IDs from CarStatus (so we can show S/M/H/I/W correctly)
+    # visual: 16=Soft, 17=Medium, 18=Hard, 7=Inter, 8=Wet (Codemasters mapping)
+    player_tyre_visual: Optional[int] = None
+    player_tyre_actual: Optional[int] = None
 
     player_team_id: Optional[int] = None  # from Participants packet (pid=4)
     player_team_name: Optional[str] = None

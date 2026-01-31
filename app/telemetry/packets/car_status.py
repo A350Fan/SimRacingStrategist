@@ -76,6 +76,21 @@ def handle_car_status_packet(self, hdr, data: bytes) -> None:
                     self.state.player_fia_flag = int(fia_flag)
                     changed = True
 
+                # NEW: tyre ids for HUD (S/M/H/I/W mapping uses *visual*)
+                try:
+                    a = int(actual)
+                    v = int(visual)
+
+                    if self.state.player_tyre_actual != a:
+                        self.state.player_tyre_actual = a
+                        changed = True
+
+                    if self.state.player_tyre_visual != v:
+                        self.state.player_tyre_visual = v
+                        changed = True
+                except Exception:
+                    pass
+
                 # --- NEW: fuel (additive, best-effort) ---
                 try:
                     fin = float(_fuel_in_tank)
