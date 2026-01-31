@@ -36,6 +36,13 @@ def handle_session_packet(self, hdr, data: bytes) -> None:
         if trk_id != self.state.track_id:
             self.state.track_id = int(trk_id)
             changed = True
+
+            # Pre-warm slick compound roles from DB as soon as we know the track.
+            # This allows the UI to instantly show C# in the correct S/M/H color.
+            try:
+                self._seed_weekend_slick_roles_from_db()
+            except Exception:
+                pass
     except Exception:
         pass
 

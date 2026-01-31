@@ -130,6 +130,43 @@ def latest_laps(limit: int = 50) -> List[Tuple]:
     )
     return cur.fetchall()
 
+def distinct_slick_compounds(game: str | None, track: str | None, session_uid: str | None = None) -> list[str]:
+    """
+    Returns distinct slick compounds stored in DB for a given game+track (optionally session_uid).
+    Output examples: ["C6","C5","C4"]
+
+    Why:
+    - Your DB already stores tyre as TEXT ("C6", "INTER", "WET").
+    - We use this to pre-warm the weekend mapping (which C is Soft/Medium/Hard).
+    """
+    if not track:
+        return []
+
+    con = connect()
+
+    where = ["track = ?", "tyre LIKE 'C%'"]
+    params: list[object] = [track]
+
+    if game:
+        where.append("game = ?")
+        params.append(game)
+
+    if session_uid:
+        where.append("session_uid = ?")
+        params.append(session_uid)
+
+    sql = f"""
+        SELECT DISTINCT tyre
+        FROM laps
+        WHERE {" AND ".join(where)}
+        ORDER BY tyre DESC
+    """
+    rows = con.execute(sql, tuple(params)).fetchall()
+    out = []
+    for (tyre,) in rows:
+        if isinstance(tyre, str) and tyre.upper().startswith("C"):
+            out.append(tyre.upper().strip())
+    return out
 
 def export_laps_to_csv(csv_path: str) -> int:
     """

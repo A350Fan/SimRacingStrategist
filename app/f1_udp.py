@@ -19,6 +19,8 @@ from app.telemetry.packets.lap_data import handle_lap_data_packet
 from app.telemetry.packets.participants import handle_participants_packet
 from app.telemetry.packets.session import handle_session_packet
 from app.telemetry.state import F1LiveState
+from app.track_map import track_label_from_id
+from app.db import distinct_slick_compounds
 
 
 class _Debounce:
@@ -336,6 +338,13 @@ class F1UDPListener:
                 self._last_session_uid = self._session_uid
                 for k in self._your_laps:
                     self._your_laps[k].clear()
+
+                # IMPORTANT: new session = reset weekend slick mapping
+                # (otherwise you might carry Spa compounds into Imola)
+                self._slick_role_map.clear()
+                self._slick_seen_actual.clear()
+                self.state.slick_role_map = {}
+                self.state.weekend_slick_compounds = None
 
             # DEBUG: Packet IDs zählen/anzeigen
             if self.debug:
@@ -690,6 +699,45 @@ class F1UDPListener:
         # expose for UI
         self.state.slick_role_map = dict(role_map)
         self.state.weekend_slick_compounds = ", ".join(sorted(labels, key=self._c_softness_key, reverse=True))
+
+    def _seed_weekend_slick_roles_from_db(self) -> None:
+        """
+        Pre-warm the weekend slick role mapping (which C is S/M/H) from existing lap DB data.
+
+        Uses:
+        - current track_id -> track name
+        - current game profile name (e.g., "F1 25") stored in DB as `game`
+        - optional session_uid filter if available
+
+        Result:
+        - state.slick_role_map becomes available immediately (if DB has >=3 different C-compounds).
+        """
+        try:
+            track_name = track_label_from_id(self.state.track_id)
+        except Exception:
+            track_name = None
+
+        if not track_name or track_name.startswith("Unknown"):
+            return
+
+        # DB uses "F1 25" like in your screenshot, so keep it consistent:
+        game_name = "F1 25" if (self.state.game_year == 25 or self.state.packet_format == 2025) else None
+        sess_uid = self.state.session_uid  # already str
+
+        # get distinct C-compounds from DB
+        compounds = distinct_slick_compounds(game_name, track_name, sess_uid)
+
+        # If session_uid is too specific (e.g. you started a fresh session),
+        # fall back to track+game in general:
+        if len(compounds) < 3:
+            compounds = distinct_slick_compounds(game_name, track_name, None)
+
+        # feed them into the same inference logic
+        for c in compounds:
+            try:
+                self._maybe_update_weekend_slick_roles(c)
+            except Exception:
+                pass
 
     def _compound_label(self, *, actual: int | None, visual: int | None, tyre_cat: str) -> str:
         """
