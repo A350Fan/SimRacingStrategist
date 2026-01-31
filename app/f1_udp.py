@@ -664,9 +664,14 @@ class F1UDPListener:
 
         Logic:
         - Keep unique C-labels we observed (player + AI).
+        - Early inference (<3 uniques):
+            - If C6 is present, it MUST be Soft (global softest).
+            - If C0 is present, it MUST be Hard (global hardest).
+            - If C1 is present and C0 is NOT present, treat C1 as Hard (practical fallback).
+          Everything else stays "?".
         - Once we have >= 3 uniques:
-            Soft  = softest (highest C#)
-            Hard  = hardest (lowest C#)
+            Soft   = softest (highest C#)
+            Hard   = hardest (lowest C#)
             Medium = median (works even if >3 are seen)
         """
         if not c_label or not c_label.startswith("C"):
@@ -678,12 +683,36 @@ class F1UDPListener:
 
         labels = set(self._slick_role_map.keys())
 
+        # -------------------------
+        # Early inference: extremes
+        # -------------------------
         if len(labels) < 3:
-            # not enough info yet (common early in a session)
-            self.state.slick_role_map = dict(self._slick_role_map)
-            self.state.weekend_slick_compounds = ", ".join(sorted(labels, key=self._c_softness_key, reverse=True))
+            # start from current map but override with safe extremes where possible
+            role_map = {lb: self._slick_role_map.get(lb, "?") for lb in labels}
+
+            # C6 is the global softest -> always Soft if present
+            if "C6" in labels:
+                role_map["C6"] = "S"
+
+            # C0 is the global hardest -> always Hard if present
+            if "C0" in labels:
+                role_map["C0"] = "H"
+
+            # Practical fallback: if we have C1 and no C0 seen, treat C1 as Hard
+            # (If C0 ever appears later, the >=3 inference will correct roles.)
+            if "C1" in labels and "C0" not in labels:
+                role_map["C1"] = "H"
+
+            self._slick_role_map = role_map
+            self.state.slick_role_map = dict(role_map)
+            self.state.weekend_slick_compounds = ", ".join(
+                sorted(labels, key=self._c_softness_key, reverse=True)
+            )
             return
 
+        # -------------------------
+        # Full inference (>=3 seen)
+        # -------------------------
         ordered = sorted(labels, key=self._c_softness_key, reverse=True)
         soft = ordered[0]
         hard = ordered[-1]
