@@ -82,5 +82,4 @@ def handle_car_damage_packet(self, hdr, data: bytes) -> None:
 
     if changed:
         self._dirty = True
-
     pass
