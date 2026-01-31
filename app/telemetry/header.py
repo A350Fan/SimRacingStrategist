@@ -79,15 +79,32 @@ def read_header(data: bytes):
 
     # --- F1 25 / modern (2025) ---
     # Header 29 bytes (includes gameYear + overallFrameIdentifier)
+    #
+    # WICHTIG:
+    # F1 25 Header laut Spec:
+    #   uint16 packetFormat
+    #   uint8  gameYear
+    #   uint8  gameMajorVersion
+    #   uint8  gameMinorVersion
+    #   uint8  packetVersion
+    #   uint8  packetId
+    #   uint64 sessionUID
+    #   float  sessionTime
+    #   uint32 frameIdentifier
+    #   uint32 overallFrameIdentifier
+    #   uint8  playerCarIndex
+    #   uint8  secondaryPlayerCarIndex
+    #
+    # => Nach packetFormat kommen genau 5× uint8!
     if len(data) >= 29 and pkt_fmt >= 2025:
         try:
             u = struct.unpack_from("<HBBBBBQfIIBB", data, 0)
             return {
                 "packetFormat": int(u[0]),  # 2025
                 "gameYear": int(u[1]),  # 25
-                "packetId": int(u[5]),
-                "sessionUID": u[6],
-                "playerCarIndex": int(u[10]),
+                "packetId": int(u[5]),  # korrekt bei 5×B
+                "sessionUID": u[6],  # korrekt aligned
+                "playerCarIndex": int(u[10]),  # korrekt aligned
                 "headerSize": 29,
             }
         except Exception:
