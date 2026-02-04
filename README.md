@@ -29,7 +29,7 @@ They document real driving sessions, raw data capture and strategy evaluation.
 👉 **YouTube Playlist – SimRacingStrategist Showcase & Telemetry**
 https://www.youtube.com/playlist?list=PLTaeLJEsWiA3Eu80V7-nnNf8FVs07YCO3
 
-[![SimRacingStrategist – Video Showcase](docs/screenshots/YT_Thumbnail.png)](https://www.youtube.com/playlist?list=PLTaeLJEsWiA3Eu80V7-nnNf8FVs07YCO3)
+[![SimRacingStrategist Playlist for F1 25 with Showcases etc.](/docs/screenshots/YT_Thumbnail.png "Playlist: SimRacingStrategist für F1 25")](https://www.youtube.com/playlist?list=PLTaeLJEsWiA3Eu80V7-nnNf8FVs07YCO3)
 
 
 Note:  
