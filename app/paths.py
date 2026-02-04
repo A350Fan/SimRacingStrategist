@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def app_dir() -> Path:
-    # Windows: %LOCALAPPDATA%\SimRaceStrategist
+    # Windows: %LOCALAPPDATA%\SimRacingStrategist
     local = os.environ.get("LOCALAPPDATA")
     if local:
         p = Path(local) / "SimRacingStrategist"

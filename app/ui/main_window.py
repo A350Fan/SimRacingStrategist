@@ -659,7 +659,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _retranslate_ui(self):
         # Window title
-        self.setWindowTitle(self.tr.t("app.title", "SimRaceStrategist – Prototype"))
+        self.setWindowTitle(self.tr.t("app.title", "SimRacingStrategist – Prototype"))
 
         # Tab titles
         self.tabs.setTabText(0, self.tr.t("tab.live", "Live"))
