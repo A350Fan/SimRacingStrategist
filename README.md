@@ -153,7 +153,7 @@ Next steps:
 
 ## License & Usage
 
-Copyright (c) 2025 A350Fan
+Copyright (c) 2025-2026 A350Fan
 
 This project is provided as **source-available software**.
 All rights are reserved by the author.
