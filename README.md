@@ -168,4 +168,4 @@ and link to the original repository.
 Commercial use or monetization by third parties is not permitted.
 Donations to the original author are explicitly allowed.
 
-See the LICENSE file for full details.
+See the [LICENSE](LICENSE) file for full details.
