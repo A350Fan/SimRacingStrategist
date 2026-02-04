@@ -21,6 +21,19 @@ SimRaceStrategist currently serves as a **lightweight technical foundation**:
 
 ---
 
+## 🎥 Video Showcase
+
+This project is accompanied by a set of longer showcase and telemetry videos.
+They document real driving sessions, raw data capture and strategy evaluation.
+
+👉 **YouTube Playlist – SimRacingStrategist Showcase & Telemetry**
+https://www.youtube.com/playlist?list=PLTaeLJEsWiA3Eu80V7-nnNf8FVs07YCO3
+
+Note:  
+Some footage is time-accelerated to make long-term effects
+(e.g. tyre wear, strategy evolution) visible in a short time.
+
+---
 ## Telemetry Input (CSV) & Third-Party Tools
 
 This project can optionally import telemetry data from CSV files.
