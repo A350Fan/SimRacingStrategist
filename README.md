@@ -29,6 +29,9 @@ They document real driving sessions, raw data capture and strategy evaluation.
 👉 **YouTube Playlist – SimRacingStrategist Showcase & Telemetry**
 https://www.youtube.com/playlist?list=PLTaeLJEsWiA3Eu80V7-nnNf8FVs07YCO3
 
+[![SimRacingStrategist – Video Showcase](docs/screenshots/YT_Thumbnail.png)](https://www.youtube.com/playlist?list=PLTaeLJEsWiA3Eu80V7-nnNf8FVs07YCO3)
+
+
 Note:  
 Some footage is time-accelerated to make long-term effects
 (e.g. tyre wear, strategy evolution) visible in a short time.
