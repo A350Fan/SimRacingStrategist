@@ -3,10 +3,25 @@
 │   │   └───inspectionProfiles
 │   │
 │   ├───logic
-│   │   └───rain_engine
+│   │   ├───rain_engine
+│   │   │    ├───core.py
+│   │   │    ├───forecast.py
+│   │   │    └───tuning.py
+│   │   └───minisectors.py
 │   │
 │   ├───telemetry
-│   │   └───packets
+│   │   ├───packets
+│   │   │   ├───car_damage.py
+│   │   │   ├───car_status.py
+│   │   │   ├───lap_data.py
+│   │   │   ├───participants.py
+│   │   │   └───session.py
+│   │   │
+│   │   ├───dump.py
+│   │   ├───header.py
+│   │   ├───state.py
+│   │   └───utils.py
+│   │   
 │   │
 │   ├───ui
 │   │   ├───tabs
@@ -16,15 +31,16 @@
 │   │   │   ├───model_tab.py
 │   │   │   └───settings_tab.py
 │   │   │
-│   │   └───widgets
-│   │       ├───ascii_hud_widget.py
-│   │       ├───flag_widget.py
-│   │       ├───lap_timer_widget.py
-│   │       ├───live_header_widget.py
-│   │       ├───minisector_widget.py
-│   │       └───strategy_cards_widget.py
-│   │
-│   ├───__pycache__
+│   │   ├───widgets
+│   │   │   ├───ascii_hud_widget.py
+│   │   │   ├───flag_widget.py
+│   │   │   ├───lap_timer_widget.py
+│   │   │   ├───live_header_widget.py
+│   │   │   ├───minisector_widget.py
+│   │   │   ├───strategy_cards_widget.py
+│   │   │   └───tyre_widget.py
+│   │   │
+│   │   └───main_window.py
 │   │
 │   ├───config.py
 │   ├───db.py
@@ -32,7 +48,6 @@
 │   ├───game_profiles.py
 │   ├───logging_util.py
 │   ├───main.py
-│   ├───minisectors.py
 │   ├───overtake_csv.py
 │   ├───paths.py
 │   ├───rain_engine.py
